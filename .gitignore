@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Dir
+Build/*
+.vs/*
+dependencies_x64/*
+/singularity/.vs
