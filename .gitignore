@@ -36,3 +36,5 @@ Build/*
 .vs/*
 dependencies_x64/*
 /singularity/.vs
+/singularity/prj_Win/x64/Debug/singularity.tlog
+/singularity/prj_Win/x64/Debug
