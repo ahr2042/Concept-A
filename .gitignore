@@ -34,5 +34,5 @@
 # Dir
 Build/*
 .vs/*
-dependencies_x64/*
+dependencies_x64/opencv/*
 /singularity/.vs
