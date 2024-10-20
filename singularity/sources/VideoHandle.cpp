@@ -9,4 +9,9 @@ VideoHandle::~VideoHandle()
 {
 }
 
+int VideoHandle::f_i_updateCameraCount()
+{
+    return 0;
+}
+
 

@@ -7,7 +7,7 @@ public:
 	VideoHandle();
 	~VideoHandle();
 
-	int f_i_updateConnectedDevices();
+	int f_i_updateCameraCount();
 
 private:
 	
