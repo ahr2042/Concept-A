@@ -32,9 +32,10 @@
 *.app
 
 # Dir
-Build/*
-.vs/*
-dependencies_x64/opencv/*
-/singularity/.vs
-/singularity/prj_Win/x64/Debug/singularity.tlog
-/singularity/prj_Win/x64/Debug
+concept_A/Build/*
+concept_A/.vs/*
+concept_A/dependencies_x64/*
+concept_A/singularity/.vs
+
+/concept_A/gui/x64/Debug/gui.tlog
+/concept_A/gui/x64/Debug/qt
