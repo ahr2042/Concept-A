@@ -15,18 +15,33 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\sources\VideoHandle.h">
+    <ClInclude Include="framework.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\sources\enum_ErrorState.h">
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MS_MediaFoundation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="e_ErrorState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="getterLib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\sources\VideoHandle.cpp">
+    <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\sources\main.cpp">
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MS_MediaFoundation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="getterLib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
