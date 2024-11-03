@@ -27,7 +27,7 @@ public:
 	void f_v_releaseResources();
 
 	
-	std::string devicesNames = nullptr;
+	std::string devicesNames;
 	UINT32 deviceCount = 0;
 
 private:

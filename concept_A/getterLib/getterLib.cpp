@@ -10,14 +10,14 @@
 #include "MS_MediaFoundation.h"
 
 
-std::vector<::MS_MediaFoundation*> m_vpo_MSMF;
+std::vector<MS_MediaFoundation*> m_vpo_MSMF;
 
-void f_v_create()
+void API_f_v_create()
 {
 	m_vpo_MSMF.push_back(new MS_MediaFoundation);
 }
 
-int f_i_init()
+int API_f_i_init()
 {
 	int v_i_errorState = e_ErrorState::NO_ERR;
 
@@ -30,29 +30,23 @@ int f_i_init()
 	return v_i_errorState;
 }
 
-int f_i_setDevice(int i_i_deviceId)
+int API_f_i_setDevice(int i_i_deviceId)
 {
 	int v_i_errorState = e_ErrorState::NO_ERR;
 	v_i_errorState = m_vpo_MSMF.at(0)->f_i_activateAndCreateSourceReader(i_i_deviceId);
-	if (v_i_errorState != e_ErrorState::NO_ERR)
-		return v_i_errorState;
-
 	v_i_errorState = m_vpo_MSMF.at(0)->f_i_deinitializeMediaFoundation();
-	if (v_i_errorState != e_ErrorState::NO_ERR)
-		return v_i_errorState;
-
 	return v_i_errorState;
 
 }
 
-int f_i_startStreaming()
+int API_f_i_startStreaming()
 {
 	int v_i_errorState = e_ErrorState::NO_ERR;
 	v_i_errorState = m_vpo_MSMF.at(0)->f_i_captureVideoFrame();
 	return v_i_errorState;
 }
 
-int f_i_stopStreaming()
+int API_f_i_stopStreaming()
 {
 	int v_i_errorState = e_ErrorState::NO_ERR;
 	m_vpo_MSMF.at(0)->f_v_releaseResources();
@@ -60,7 +54,7 @@ int f_i_stopStreaming()
 
 }
 
-void f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation)
+void API_f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation)
 {
 	std::string v_str_source;
 	switch ((e_ErrorState)i_i_errorId)
@@ -96,5 +90,15 @@ void f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation)
 		v_str_source = "Unkown Err" + std::to_string(i_i_errorId);
 		break;
 	}
-	o_pc_interpretation = (char*)v_str_source.c_str();
+	strcpy_s(o_pc_interpretation, MAX_PARAMETER_SIZE, v_str_source.c_str());
+}
+
+
+void API_f_v_getDevicesNames(char* o_pc_names)
+{
+	if (m_vpo_MSMF.at(0)->deviceCount != 0)
+	{
+		strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, m_vpo_MSMF.at(0)->devicesNames.c_str());		
+	}
+	strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, "\0");
 }
