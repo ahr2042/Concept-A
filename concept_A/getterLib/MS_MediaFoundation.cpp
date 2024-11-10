@@ -77,6 +77,11 @@ int MS_MediaFoundation::f_i_activateAndCreateSourceReader(int i_i_deviceNumber)
 
 void MS_MediaFoundation::f_v_getDeviceFriendlyName()
 {
+    if (deviceCount == 0)
+    {
+        f_i_deinitializeMediaFoundation();
+        return;
+    }
     WCHAR* deviceName = nullptr;
     UINT32 nameLength = 0;
     
