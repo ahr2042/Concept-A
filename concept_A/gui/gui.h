@@ -25,7 +25,9 @@ private:
 
     e_ErrorState f_e_updateDevicesCombobox();
     int f_i_getDeviceIdFromCombobox();
-    e_ErrorState f_e_startStreaming(int i_i_deviceId);
+    e_ErrorState f_e_startStreaming();
+    e_ErrorState f_e_stopStreaming();
     void f_v_updateLogWithNewInfo(QString i_o_newInfo);
     QString f_o_interpreteError(e_ErrorState i_e_errorId);
+
 };

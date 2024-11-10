@@ -40,9 +40,17 @@ int gui::f_i_getDeviceIdFromCombobox()
     return m_i_deviceId;
 }
 
-e_ErrorState gui::f_e_startStreaming(int i_i_deviceId)
+e_ErrorState gui::f_e_startStreaming()
 {
     e_ErrorState v_e_errorState = NO_ERR;
+    if (m_i_deviceId < 0)
+    {
+        f_i_getDeviceIdFromCombobox();
+        if (m_i_deviceId < 0)
+        {
+            return INVALID_DEVICE_ID_ERR;
+        }
+    }
     v_e_errorState = (e_ErrorState)API_f_i_setDevice(m_i_deviceId);
     if (v_e_errorState != NO_ERR)
     {
@@ -52,6 +60,13 @@ e_ErrorState gui::f_e_startStreaming(int i_i_deviceId)
     v_e_errorState = (e_ErrorState)API_f_i_startStreaming();
     return v_e_errorState;
 }
+
+e_ErrorState gui::f_e_stopStreaming()
+{
+    return (e_ErrorState)API_f_i_stopStreaming();
+}
+
+
 
 void gui::f_v_updateLogWithNewInfo(QString i_o_newInfo)
 {
@@ -72,10 +87,11 @@ QString gui::f_o_interpreteError(e_ErrorState i_e_errorId)
 }
 
 
+
 void gui::f_v_handleButtonPress()
 {
-    QString v_o_buttonName = qobject_cast<QPushButton*>(sender())->objectName();    
-    e_ErrorState v_e_errorState = NO_ERR;
+    QString v_o_buttonName = QObject::sender()->objectName();    
+    e_ErrorState v_e_errorState = (e_ErrorState)NO_ERR;
     if (v_o_buttonName == ui.m_btn_init->objectName())
     {        
         API_f_v_create();
@@ -87,12 +103,17 @@ void gui::f_v_handleButtonPress()
     }
     else if (v_o_buttonName == ui.m_btn_start->objectName())
     {
-
+        v_e_errorState = f_e_startStreaming();
     }
     else if (v_o_buttonName == ui.m_btn_stop->objectName())
     {
-
+        v_e_errorState = f_e_stopStreaming();
     }
+    else if (v_o_buttonName == ui.m_cmbBx_devicesList->objectName())
+    {
+        f_i_getDeviceIdFromCombobox();        
+    }
+
 
     if (v_e_errorState != NO_ERR)
     {

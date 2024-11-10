@@ -34,7 +34,10 @@ int API_f_i_setDevice(int i_i_deviceId)
 {
 	int v_i_errorState = e_ErrorState::NO_ERR;
 	v_i_errorState = m_vpo_MSMF.at(0)->f_i_activateAndCreateSourceReader(i_i_deviceId);
-	v_i_errorState = m_vpo_MSMF.at(0)->f_i_deinitializeMediaFoundation();
+	if (v_i_errorState == e_ErrorState::NO_ERR)
+	{
+		v_i_errorState = m_vpo_MSMF.at(0)->f_i_deinitializeMediaFoundation();
+	}
 	return v_i_errorState;
 
 }
@@ -99,6 +102,7 @@ void API_f_v_getDevicesNames(char* o_pc_names)
 	if (m_vpo_MSMF.at(0)->deviceCount != 0)
 	{
 		strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, m_vpo_MSMF.at(0)->devicesNames.c_str());		
+		return;
 	}
 	strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, "\0");
 }
