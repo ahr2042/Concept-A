@@ -5,7 +5,7 @@
 #include <cstring>
 #include <vector>
 
-#include "getterLib.h"
+#include "MFgetterLib.h"
 
 #include "MS_MediaFoundation.h"
 

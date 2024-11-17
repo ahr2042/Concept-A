@@ -24,6 +24,7 @@
     <ProjectGuid>{bd0f3430-f07b-4164-b1a5-f9f7be4898ee}</ProjectGuid>
     <RootNamespace>getterLib</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>MFgetterLib</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -151,13 +152,13 @@
   <ItemGroup>
     <ClInclude Include="e_ErrorState.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="getterLib.h" />
+    <ClInclude Include="MFgetterLib.h" />
     <ClInclude Include="MS_MediaFoundation.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="getterLib.cpp" />
+    <ClCompile Include="MFgetterLib.cpp" />
     <ClCompile Include="MS_MediaFoundation.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
