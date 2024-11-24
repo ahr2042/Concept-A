@@ -11,9 +11,18 @@
 #include <memory>
 #include <stdexcept>
 #include <map>
+#include <vector>
+#include <iostream>
+
+#include "errorState.h"
 
 class GStreamerSource {
 public:
+    struct deviceProperties
+    {
+        std::string deviceName = "";
+        GstCaps* deviceCapabilities = nullptr;
+    };
     // Enum for source types
     enum class SourceType {
         File,
@@ -38,6 +47,14 @@ private:
     GstElement* createScreenSource(const std::string& config);
     GstElement* createTestSource(const std::string& config);
     GstElement* createCustomSource(const std::string& config);
+
+    static int getDevices();
+    static GStreamerSource* createElement(std::string deviceName);
+    static void addDevicePropertie(std::string, GstCaps*);
+    static void getDeviceInfoReadable(deviceProperties*);
+    static gboolean process_structure_field(GQuark, const GValue*, gpointer);
+
+    
 
     // GStreamer source element
     GstElement* sourceElement;
