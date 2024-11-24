@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "GStreamerSource.h"
 
 static std::vector<GStreamerSource::deviceProperties*> devicesContainer;
@@ -182,8 +183,8 @@ int GStreamerSource::getDevices()
 
 GStreamerSource* GStreamerSource::createElement(std::string deviceName)
 {
-    GStreamerSource* tmp;
-    return tmp;
+    
+    return nullptr;
 }
 
 
