@@ -160,6 +160,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="GStreamerSink.h" />
     <ClInclude Include="GStreamerSource.h" />
+    <ClInclude Include="MediaFusionGCV_API.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PipelineConfig.h" />
     <ClInclude Include="PipelineManager.h" />
@@ -167,6 +168,7 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="GStreamerSource.cpp" />
+    <ClCompile Include="MediaFusionGCV_API.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

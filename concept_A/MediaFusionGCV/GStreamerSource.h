@@ -14,9 +14,11 @@
 #include <vector>
 #include <iostream>
 
+#include "PipelineManager.h"
+
 #include "errorState.h"
 
-class GStreamerSource {
+class GStreamerSource : public PipelineManager {
 public:
     struct deviceProperties
     {
@@ -24,6 +26,8 @@ public:
         GstCaps* deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
     };
+
+
     // Enum for source types
     enum class SourceType {
         File,
@@ -66,4 +70,6 @@ private:
 
     // Helper to parse configurations (e.g., JSON, strings, or key-value pairs)
     std::map<std::string, std::string> parseConfig(const std::string& config);
+
+
 };
