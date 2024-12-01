@@ -11,13 +11,13 @@
 extern "C"
 #endif
 {
-	GETTERLIB_API void API_f_v_create();
-	GETTERLIB_API int API_f_i_init();
-	GETTERLIB_API void API_f_v_getDevicesNames(char* o_pc_names);
-	GETTERLIB_API int API_f_i_setDevice(int i_i_deviceId);
-	GETTERLIB_API int API_f_i_startStreaming();
-	GETTERLIB_API int API_f_i_stopStreaming();
-	GETTERLIB_API void API_f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation);
+	GETTERLIB_API int32_t mediaLib_create();
+	GETTERLIB_API int32_t mediaLib_init();
+	GETTERLIB_API int32_t mediaLib_getDevicesNames(char* o_pc_names);
+	GETTERLIB_API int32_t mediaLib_setDevice(int32_t i_i_deviceId);
+	GETTERLIB_API int32_t mediaLib_startStreaming();
+	GETTERLIB_API int32_t mediaLib_stopStreaming();
+	GETTERLIB_API int32_t mediaLib_interpreteError(int32_t i_i_errorId, char* o_pc_interpretation);
 
 #ifdef __cplusplus
 }

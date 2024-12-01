@@ -12,52 +12,56 @@
 
 std::vector<MS_MediaFoundation*> m_vpo_MSMF;
 
-void API_f_v_create()
+int32_t mediaLib_create()
 {
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
+
 	m_vpo_MSMF.push_back(new MS_MediaFoundation);
+	return errorState;
+
 }
 
-int API_f_i_init()
+int32_t mediaLib_init()
 {
-	int v_i_errorState = e_ErrorState::NO_ERR;
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
 
-	v_i_errorState = m_vpo_MSMF.at(0)->f_i_initializeMediaFoundation();
-	if (v_i_errorState != e_ErrorState::NO_ERR)
-		return v_i_errorState;
+	errorState = m_vpo_MSMF.at(0)->f_i_initializeMediaFoundation();
+	if (errorState != e_ErrorState::NO_ERR)
+		return errorState;
 
 	m_vpo_MSMF.at(0)->f_v_getDeviceFriendlyName();
 
-	return v_i_errorState;
+	return errorState;
 }
 
-int API_f_i_setDevice(int i_i_deviceId)
+int32_t mediaLib_setDevice(int32_t i_i_deviceId)
 {
-	int v_i_errorState = e_ErrorState::NO_ERR;
-	v_i_errorState = m_vpo_MSMF.at(0)->f_i_activateAndCreateSourceReader(i_i_deviceId);
-	if (v_i_errorState == e_ErrorState::NO_ERR)
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
+	errorState = m_vpo_MSMF.at(0)->f_i_activateAndCreateSourceReader(i_i_deviceId);
+	if (errorState == e_ErrorState::NO_ERR)
 	{
-		v_i_errorState = m_vpo_MSMF.at(0)->f_i_deinitializeMediaFoundation();
+		errorState = m_vpo_MSMF.at(0)->f_i_deinitializeMediaFoundation();
 	}
-	return v_i_errorState;
+	return errorState;
 
 }
 
-int API_f_i_startStreaming()
+int32_t mediaLib_startStreaming()
 {
-	int v_i_errorState = e_ErrorState::NO_ERR;
-	v_i_errorState = m_vpo_MSMF.at(0)->f_i_captureVideoFrame();
-	return v_i_errorState;
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
+	errorState = m_vpo_MSMF.at(0)->f_i_captureVideoFrame();
+	return errorState;
 }
 
-int API_f_i_stopStreaming()
+int32_t mediaLib_stopStreaming()
 {
-	int v_i_errorState = e_ErrorState::NO_ERR;
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
 	m_vpo_MSMF.at(0)->f_v_releaseResources();
-	return v_i_errorState;
+	return errorState;
 
 }
 
-void API_f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation)
+int32_t mediaLib_interpreteError(int32_t i_i_errorId, char* o_pc_interpretation)
 {
 	std::string v_str_source;
 	switch ((e_ErrorState)i_i_errorId)
@@ -94,15 +98,18 @@ void API_f_v_interpreteError(int i_i_errorId, char* o_pc_interpretation)
 		break;
 	}
 	strcpy_s(o_pc_interpretation, MAX_PARAMETER_SIZE, v_str_source.c_str());
+	return (int32_t)e_ErrorState::NO_ERR;
 }
 
 
-void API_f_v_getDevicesNames(char* o_pc_names)
+int32_t mediaLib_getDevicesNames(char* o_pc_names)
 {
+	int32_t errorState = (int32_t)e_ErrorState::NO_ERR;
 	if (m_vpo_MSMF.at(0)->deviceCount != 0)
 	{
 		strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, m_vpo_MSMF.at(0)->devicesNames.c_str());		
 		return;
 	}
 	strcpy_s(o_pc_names, MAX_PARAMETER_SIZE, "\0");
+	return errorState;
 }
