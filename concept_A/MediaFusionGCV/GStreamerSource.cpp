@@ -207,50 +207,53 @@ void GStreamerSource::addDevicePropertie(std::string deviceName, GstCaps* device
 }
 
 
-void GStreamerSource::getDeviceInfoReadable(deviceProperties* vidDevice)
+std::string GStreamerSource::getDeviceInfoReadable(int deviceId, deviceProperties* vidDevice)
 {
     if (vidDevice == nullptr)
     {
-        return;
-    }
-
+        return std::string();
+    }    
     for (guint i = 0; i < gst_caps_get_size(vidDevice->deviceCapabilities); ++i) {
         const GstStructure* structure = gst_caps_get_structure(vidDevice->deviceCapabilities, i);
         if (!structure) {
             std::cerr << "    Failed to retrieve structure from caps." << std::endl;
             continue;
         }
-        std::cout << "    Capability " << i + 1 << ":" << std::endl;
+        if (i > 0)
+        {
+            devicesContainer[deviceId]->formattedDeviceCapabilities << ";";
+        }
+        devicesContainer[deviceId]->formattedDeviceCapabilities << "    Capability " << i + 1 << ":" << std::endl;
 
         // Print the media type (name of the structure)
         const gchar* name = gst_structure_get_name(structure);
         if (name) {
-            std::cout << "      Media Type: " << name << std::endl;
+            devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: " << name << std::endl;
         }
         else {
-            std::cout << "      Media Type: Unknown" << std::endl;
-        }
-
+            devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: Unknown" << std::endl;
+        }        
         // Process and print all fields in the structure
-        gst_structure_foreach(structure, process_structure_field, nullptr);
-
-
+        gst_structure_foreach(structure, process_structure_field, devicesContainer[deviceId]);
     }
+    return devicesContainer[deviceId]->formattedDeviceCapabilities.str();
 }
 
-gboolean GStreamerSource::process_structure_field(GQuark field_id, const GValue* value, gpointer user_data) {
+gboolean GStreamerSource::process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
     if (!value) {
         std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Null value encountered in structure field: " << field_id << std::endl;
         return TRUE;  // Continue gracefully
     }
     gchar* value_str = g_strdup_value_contents(value);
     const gchar* fieldName = g_quark_to_string(field_id);
     if (value_str) {
-        std::cout << "        " << fieldName << ": " << value_str << std::endl;
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "        " << fieldName << ": " << value_str << std::endl;
         g_free(value_str);
     }
     else {
         std::cerr << "  Failed to get value contents for field: " << fieldName << std::endl;
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Failed to get value contents for field: " << fieldName << std::endl;
     }
     return TRUE;  // Continue iteration
 

@@ -22,6 +22,7 @@ public:
     {
         std::string deviceName = "";
         GstCaps* deviceCapabilities = nullptr;
+        std::stringstream formattedDeviceCapabilities;
     };
     // Enum for source types
     enum class SourceType {
@@ -51,7 +52,7 @@ private:
     static int getDevices();
     static GStreamerSource* createElement(std::string deviceName);
     static void addDevicePropertie(std::string, GstCaps*);
-    static void getDeviceInfoReadable(deviceProperties*);
+    static std::string getDeviceInfoReadable(int deviceId, deviceProperties*);
     static gboolean process_structure_field(GQuark, const GValue*, gpointer);
 
     
