@@ -1,5 +1,8 @@
 #pragma once
-class GStreamerSink {
+
+
+
+class GStreamerSink{
 public:
 private:
 };

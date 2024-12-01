@@ -5,17 +5,16 @@
 
 class PipelineManager {
 public:
+    PipelineManager() {};
+
     errorState getDevices();
 
-protected:
-    std::vector<GStreamerSource*> mediaSources;
-    std::vector<GStreamerSink*> mediaSinks;
-
-    
 
 private:
 
-    
+    std::vector<GStreamerSource*> mediaSources;
+    std::vector<GStreamerSink*> mediaSinks;
+
     
 
 };

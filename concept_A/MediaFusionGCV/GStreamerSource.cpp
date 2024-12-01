@@ -137,7 +137,7 @@ std::map<std::string, std::string> GStreamerSource::parseConfig(const std::strin
     return options;
 }
 
-int GStreamerSource::getDevices()
+int GStreamerSource::getSourceDevices()
 {
     GstDeviceMonitor* device_monitor = gst_device_monitor_new();
     if (!device_monitor) {

@@ -56,5 +56,8 @@
     <ClCompile Include="MediaFusionGCV_API.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="PipelineManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

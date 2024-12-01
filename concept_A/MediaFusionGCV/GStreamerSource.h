@@ -14,11 +14,11 @@
 #include <vector>
 #include <iostream>
 
-#include "PipelineManager.h"
+
 
 #include "errorState.h"
 
-class GStreamerSource : public PipelineManager {
+class GStreamerSource {
 public:
     struct deviceProperties
     {
@@ -53,7 +53,7 @@ private:
     GstElement* createTestSource(const std::string& config);
     GstElement* createCustomSource(const std::string& config);
 
-    static int getDevices();
+    static int getSourceDevices();
     static GStreamerSource* createElement(std::string deviceName);
     static void addDevicePropertie(std::string, GstCaps*);
     static std::string getDeviceInfoReadable(int deviceId, deviceProperties*);

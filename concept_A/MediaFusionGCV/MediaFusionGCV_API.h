@@ -16,16 +16,29 @@
 
 #include <stdint.h>
 
+struct deviceProperties
+{
+	std::string deviceName = "";
+	std::string formattedDeviceCapabilities = "";
+};
+
+enum sourceType
+{
+	File, Camera, Network, Screen, Test, Custom
+};
+
 #ifdef __cplusplus
 	extern "C" {
 #endif
 
 	MEDIAFUSIONGCV_API int32_t mediaLib_create();
-	MEDIAFUSIONGCV_API int32_t mediaLib_init();
-	MEDIAFUSIONGCV_API int32_t mediaLib_getDevicesNames(char* );
-	MEDIAFUSIONGCV_API int32_t mediaLib_setDevice(int32_t );
-	MEDIAFUSIONGCV_API int32_t mediaLib_startStreaming();
-	MEDIAFUSIONGCV_API int32_t mediaLib_stopStreaming();
+	MEDIAFUSIONGCV_API int32_t mediaLib_init(int32_t );
+	MEDIAFUSIONGCV_API int32_t mediaLib_getDevices(int32_t, int32_t, deviceProperties* );
+	MEDIAFUSIONGCV_API int32_t mediaLib_setDevice(int32_t , int32_t );
+	MEDIAFUSIONGCV_API int32_t mediaLib_startStreaming(int32_t );
+	MEDIAFUSIONGCV_API int32_t mediaLib_stopStreaming(int32_t );
+
+	MEDIAFUSIONGCV_API int32_t mediaLib_delete(int32_t);
 
 
 #ifdef __cplusplus
