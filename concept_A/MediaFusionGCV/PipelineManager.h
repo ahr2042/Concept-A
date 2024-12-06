@@ -1,13 +1,16 @@
 #pragma once
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
+#include "PipelineConfig.h"
+#include "SourceType.h"
 
 
 class PipelineManager {
 public:
-    PipelineManager() {};
+    PipelineManager();
+    PipelineManager(SourceType );
 
-    errorState getDevices();
+    
 
 
 private:

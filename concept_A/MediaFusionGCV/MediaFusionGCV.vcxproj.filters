@@ -42,6 +42,12 @@
     <ClInclude Include="MediaFusionGCV_API.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SourceType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GStreamerSourceCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -53,10 +59,13 @@
     <ClCompile Include="GStreamerSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MediaFusionGCV_API.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="PipelineManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MediaFusionGCV_API.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSourceCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,8 +1,31 @@
 #include "pch.h"
 #include "PipelineManager.h"
 
-errorState PipelineManager::getDevices()
+
+
+PipelineManager::PipelineManager()
 {
 
-	return errorState::NO_ERR;
+}
+
+PipelineManager::PipelineManager(SourceType chosenType)
+{
+	switch (chosenType)
+	{
+	case File:
+		break;
+	case Camera:
+		mediaSources.push_back(new GStreamerSourceCamera);
+		break;
+	case Network:
+		break;
+	case Screen:
+		break;
+	case Test:
+		break;
+	case Custom:
+		break;
+	default:
+		break;
+	}
 }
