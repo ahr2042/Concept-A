@@ -35,13 +35,14 @@ int32_t mediaLib_init(int32_t pipelineId)
 // ############################################
 int32_t mediaLib_getDevices(int32_t pipelineId, sourceType typeId, deviceProperties* propertiesStructure)
 {
+	int32_t result = (int32_t)errorState::NO_ERR;
 	switch (typeId)
 	{
 	case File:
 		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
 		break;
 	case Camera:
-		pipelines[pipelineId]->getDevices();
+		result = pipelines[pipelineId]->getDevices();
 		break;
 	case Network:
 		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
@@ -60,7 +61,7 @@ int32_t mediaLib_getDevices(int32_t pipelineId, sourceType typeId, devicePropert
 		break;
 	}
 	
-	return (int32_t)errorState::NO_ERR;
+	return result;
 
 }
 
