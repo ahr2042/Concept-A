@@ -2,13 +2,21 @@
 #include "MediaFusionGCV_API.h"
 #include "PipelineManager.h"
 
+
 #include "errorState.h"
 
 std::vector<PipelineManager*> pipelines;
 
-int32_t mediaLib_create()
+
+MEDIAFUSIONGCV_API int32_t mediaLib_GStreamerInit(int argc, char* argv[])
 {
-	pipelines.push_back(new PipelineManager);
+	gst_init(&argc, &argv);
+}
+
+
+int32_t mediaLib_create(SourceType chosenType)
+{
+	pipelines.push_back(new PipelineManager(chosenType));
 	return pipelines.size() -1;
 }
 
@@ -33,34 +41,18 @@ int32_t mediaLib_init(int32_t pipelineId)
 //		enum class SourceType { File, Camera, Network, Screen, Test, Custom };
 // @Para names: 
 // ############################################
-int32_t mediaLib_getDevices(int32_t pipelineId, sourceType typeId, deviceProperties* propertiesStructure)
+int32_t mediaLib_getDevices(int32_t pipelineId, deviceProperties* sourceDevices)
 {
 	int32_t result = (int32_t)errorState::NO_ERR;
-	switch (typeId)
+	std::string tmp = "";
+	result = pipelines[pipelineId]->getSourceInformation(-1, tmp);
+	sourceDevices = new deviceProperties[result];
+	for (int i = 0; i < result; i++)
 	{
-	case File:
-		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
-		break;
-	case Camera:
-		result = pipelines[pipelineId]->getDevices();
-		break;
-	case Network:
-		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
-		break;
-	case Screen:
-		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
-		break;
-	case Test:
-		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
-		break;
-	case Custom:
-		return (int32_t)NOT_IMPLEMENTED_YET_ERR;
-		break;
-	default:
-		return (int32_t)UNDEFINED_DEVICE_TYPE_ID_ERR;
-		break;
+		sourceDevices[i].deviceName
 	}
 	
+
 	return result;
 
 }

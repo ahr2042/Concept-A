@@ -3,36 +3,36 @@
 
 
 
-// Constructor
-GStreamerSource::GStreamerSource(SourceType type, const std::string& config)
-    : sourceType(type), sourceConfig(config), sourceElement(nullptr) {
-    switch (sourceType) {
-    case SourceType::File:
-        
-        break;
-    case SourceType::Camera:
-        
-        break;
-    case SourceType::Network:
-        
-        break;
-    case SourceType::Screen:
-        
-        break;
-    case SourceType::Test:
-        
-        break;
-    case SourceType::Custom:
-        sourceElement = createCustomSource(config);
-        break;
-    default:
-        throw std::invalid_argument("Unsupported source type");
-    }
-
-    if (!sourceElement) {
-        throw std::runtime_error("Failed to create GStreamer source element");
-    }
-}
+//// Constructor
+//GStreamerSource::GStreamerSource(SourceType type, const std::string& config)
+//    : sourceType(type), sourceConfig(config), sourceElement(nullptr) {
+//    switch (sourceType) {
+//    case SourceType::File:
+//        
+//        break;
+//    case SourceType::Camera:
+//        
+//        break;
+//    case SourceType::Network:
+//        
+//        break;
+//    case SourceType::Screen:
+//        
+//        break;
+//    case SourceType::Test:
+//        
+//        break;
+//    case SourceType::Custom:
+//        
+//        break;
+//    default:
+//        throw std::invalid_argument("Unsupported source type");
+//    }
+//
+//    if (!sourceElement) {
+//        throw std::runtime_error("Failed to create GStreamer source element");
+//    }
+//}
 
 // Destructor
 GStreamerSource::~GStreamerSource() {

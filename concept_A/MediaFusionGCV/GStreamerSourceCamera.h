@@ -4,10 +4,16 @@
 class GStreamerSourceCamera : public GStreamerSource
 {
 public:
-    GStreamerSourceCamera() { Sleep(100); };
-	int32_t getSourceDevices();
+    GStreamerSourceCamera();
+    std::vector<deviceProperties*> devicesContainer;
+    std::pair<std::string, std::string> getDeviceInfoReadable();
+
 private:
+    
+    int32_t getSourceDevices();
     void addDevicePropertie(std::string, GstCaps*);
-    std::string getDeviceInfoReadable(int deviceId, deviceProperties*);
+    
      gboolean process_structure_field(GQuark, const GValue*, gpointer);
+
+      
 };

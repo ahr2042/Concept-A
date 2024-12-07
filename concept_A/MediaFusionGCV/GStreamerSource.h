@@ -22,8 +22,8 @@
 
 class GStreamerSource {
 public:
-    
-    GStreamerSource(SourceType type, const std::string& config = "");
+    GStreamerSource() {};
+    //GStreamerSource(SourceType type, const std::string& config = "");
     ~GStreamerSource();
 
 
@@ -31,26 +31,19 @@ public:
     // Public method to get the configured GStreamer source element
     GstElement* getSourceElement();
 
-protected:
     struct deviceProperties
     {
-        std::string deviceName = "";
+        std::string deviceName = "";     
         GstCaps* deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
     };
 
-    // Private helper methods for each source type
-    //GstElement* createFileSource(const std::string& config);
-    //GstElement* createCameraSource(const std::string& config);
-    //GstElement* createNetworkSource(const std::string& config);
-    //GstElement* createScreenSource(const std::string& config);
-    //GstElement* createTestSource(const std::string& config);
-    //GstElement* createCustomSource(const std::string& config);
 
-    virtual int32_t getSourceDevices() {};
+    
+    virtual int32_t getSourceDevices() {};   
     virtual GStreamerSource* createElement(std::string deviceName) {};
     virtual void addDevicePropertie(std::string, GstCaps*) {};
-    virtual std::string getDeviceInfoReadable(int deviceId, deviceProperties*) {};
+    virtual std::pair<std::string, std::string> getDeviceInfoReadable() {};
     virtual gboolean process_structure_field(GQuark, const GValue*, gpointer) {};
 
     

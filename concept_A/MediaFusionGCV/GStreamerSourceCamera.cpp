@@ -1,8 +1,14 @@
 #include "pch.h"
 #include "GStreamerSourceCamera.h"
 
+GStreamerSourceCamera::GStreamerSourceCamera()
+{
+    int32_t result = getSourceDevices();    
+}
+
 int32_t GStreamerSourceCamera::getSourceDevices()
 {
+    
     GstDeviceMonitor* device_monitor = gst_device_monitor_new();
     if (!device_monitor) {
         return CREATE_DEVICE_MONITOR_ERR;
@@ -64,36 +70,41 @@ void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* 
     devicesContainer.push_back(currentDevice);
 }
 
-std::string GStreamerSourceCamera::getDeviceInfoReadable(int deviceId, deviceProperties* vidDevice)
-{
-    if (vidDevice == nullptr)
+// TODO return name of device and cap in a list ! look how to do it
+std::pair<std::string, std::string> GStreamerSourceCamera::getDeviceInfoReadable()
+{    
+    int totalDevicesNumebr = devicesContainer.size();
+    for (int deviceId = 0; deviceId < totalDevicesNumebr; deviceId++)
     {
-        return std::string();
-    }
-    for (guint i = 0; i < gst_caps_get_size(vidDevice->deviceCapabilities); ++i) {
-        const GstStructure* structure = gst_caps_get_structure(vidDevice->deviceCapabilities, i);
-        if (!structure) {
-            std::cerr << "    Failed to retrieve structure from caps." << std::endl;
-            continue;
-        }
-        if (i > 0)
+        if (devicesContainer[deviceId] == nullptr)
         {
-            devicesContainer[deviceId]->formattedDeviceCapabilities << ";";
+            return std::make_pair(std::string(), std::string());
         }
-        devicesContainer[deviceId]->formattedDeviceCapabilities << "    Capability " << i + 1 << ":" << std::endl;
+        for (guint i = 0; i < gst_caps_get_size(devicesContainer[deviceId]->deviceCapabilities); ++i) {
+            const GstStructure* structure = gst_caps_get_structure(devicesContainer[deviceId]->deviceCapabilities, i);
+            if (!structure) {
+                std::cerr << "    Failed to retrieve structure from caps." << std::endl;
+                continue;
+            }
+            if (i > 0)
+            {
+                devicesContainer[deviceId]->formattedDeviceCapabilities << ";";
+            }
+            devicesContainer[deviceId]->formattedDeviceCapabilities << "    Capability " << i + 1 << ":" << std::endl;
 
-        // Print the media type (name of the structure)
-        const gchar* name = gst_structure_get_name(structure);
-        if (name) {
-            devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: " << name << std::endl;
+            // Print the media type (name of the structure)
+            const gchar* name = gst_structure_get_name(structure);
+            if (name) {
+                devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: " << name << std::endl;
+            }
+            else {
+                devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: Unknown" << std::endl;
+            }
+            // Process and print all fields in the structure
+            gst_structure_foreach(structure, process_structure_field, devicesContainer[deviceId]);
         }
-        else {
-            devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: Unknown" << std::endl;
-        }
-        // Process and print all fields in the structure
-        gst_structure_foreach(structure, process_structure_field, devicesContainer[deviceId]);
+        return std::make_pair(devicesContainer[deviceId]->deviceName, devicesContainer[deviceId]->formattedDeviceCapabilities.str());
     }
-    return devicesContainer[deviceId]->formattedDeviceCapabilities.str();
 }
 
 

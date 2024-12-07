@@ -2,6 +2,7 @@
 
 enum SourceType
 {
+    None,
     File,
     Camera,
     Network,
