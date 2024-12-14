@@ -71,14 +71,15 @@ void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* 
 }
 
 // TODO return name of device and cap in a list ! look how to do it
-std::pair<std::string, std::string> GStreamerSourceCamera::getDeviceInfoReadable()
+std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
 {    
+    std::list<std::pair<std::string, std::string>> devicesList;
     int totalDevicesNumebr = devicesContainer.size();
     for (int deviceId = 0; deviceId < totalDevicesNumebr; deviceId++)
     {
         if (devicesContainer[deviceId] == nullptr)
-        {
-            return std::make_pair(std::string(), std::string());
+        {                        
+            continue;
         }
         for (guint i = 0; i < gst_caps_get_size(devicesContainer[deviceId]->deviceCapabilities); ++i) {
             const GstStructure* structure = gst_caps_get_structure(devicesContainer[deviceId]->deviceCapabilities, i);
@@ -103,8 +104,9 @@ std::pair<std::string, std::string> GStreamerSourceCamera::getDeviceInfoReadable
             // Process and print all fields in the structure
             gst_structure_foreach(structure, process_structure_field, devicesContainer[deviceId]);
         }
-        return std::make_pair(devicesContainer[deviceId]->deviceName, devicesContainer[deviceId]->formattedDeviceCapabilities.str());
+        devicesList.push_back(std::make_pair(devicesContainer[deviceId]->deviceName, devicesContainer[deviceId]->formattedDeviceCapabilities.str()));
     }
+    return devicesList;
 }
 
 

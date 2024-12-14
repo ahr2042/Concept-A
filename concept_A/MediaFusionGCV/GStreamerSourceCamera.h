@@ -6,7 +6,7 @@ class GStreamerSourceCamera : public GStreamerSource
 public:
     GStreamerSourceCamera();
     std::vector<deviceProperties*> devicesContainer;
-    std::pair<std::string, std::string> getDeviceInfoReadable();
+    std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
 private:
     
