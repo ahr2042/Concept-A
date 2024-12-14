@@ -1,8 +1,28 @@
 #pragma once
+
+#include <gst/gst.h>
+
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
+#include <string>
+#include <sstream>
+#include <list>
+#include <memory>
+#include <stdexcept>
+#include <map>
+#include <vector>
+#include <iostream>
+
+
+#include "SourceType.h"
+#include "errorState.h"
+
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
 #include "PipelineConfig.h"
-#include "SourceType.h"
+
 
 
 class PipelineManager {
@@ -10,8 +30,8 @@ public:
     PipelineManager();
     PipelineManager(SourceType );
 
-    int32_t getSourceInformation(int deviceId, std::string&);
-    int32_t getSinkDevices(int deviceId, std::string);
+    int32_t getSourceInformation(std::list<std::pair<std::string, std::string>>&);
+    int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
     
 
 

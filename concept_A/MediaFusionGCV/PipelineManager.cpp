@@ -2,6 +2,7 @@
 #include "PipelineManager.h"
 
 
+#include "GStreamerSourceCamera.h";
 
 PipelineManager::PipelineManager()
 {
@@ -33,10 +34,14 @@ PipelineManager::PipelineManager(SourceType chosenType)
 	pipelineManagerInfo.numberOfSources++;
 }
 
-int32_t PipelineManager::getSourceInformation(int deviceId, std::string& cap)
+int32_t PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
 {
-	int32_t result = errorState::NO_ERR;
-	((GStreamerSourceCamera*)mediaSources[pipelineManagerInfo.numberOfSources])->devicesContainer.size()
-	cap = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable(deviceId);
+	int32_t result = errorState::NO_ERR;	
+	devicesList = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable();
+	if (devicesList.empty())
+	{
+		return NO_VIDEO_DEVICE_FOUND_ERR;
+	}
+
 	return result;
 }

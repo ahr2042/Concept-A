@@ -3,7 +3,6 @@
 #include "PipelineManager.h"
 
 
-#include "errorState.h"
 
 std::vector<PipelineManager*> pipelines;
 
@@ -44,15 +43,26 @@ int32_t mediaLib_init(int32_t pipelineId)
 int32_t mediaLib_getDevices(int32_t pipelineId, deviceProperties* sourceDevices)
 {
 	int32_t result = (int32_t)errorState::NO_ERR;
-	std::string tmp = "";
-	result = pipelines[pipelineId]->getSourceInformation(-1, tmp);
-	sourceDevices = new deviceProperties[result];
-	for (int i = 0; i < result; i++)
+	if (sourceDevices != nullptr)
 	{
-		sourceDevices[i].deviceName
+		delete[] sourceDevices;
+		sourceDevices = nullptr;
 	}
 	
-
+	std::list<std::pair<std::string, std::string>> devicesList;
+	result = pipelines[pipelineId]->getSourceInformation(devicesList);
+	if (result == (int32_t)errorState::NO_ERR)
+	{
+		size_t numberOfDevices = devicesList.size();
+		sourceDevices = new deviceProperties[numberOfDevices];
+		for (int i = 0; i < numberOfDevices; i++)
+		{
+			std::pair<std::string, std::string> device = devicesList.front();
+			sourceDevices[i].deviceName = device.first;
+			sourceDevices[i].formattedDeviceCapabilities = device.second;
+			devicesList.pop_front();
+		}
+	}
 	return result;
 
 }

@@ -70,7 +70,7 @@ void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* 
     devicesContainer.push_back(currentDevice);
 }
 
-// TODO return name of device and cap in a list ! look how to do it
+
 std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
 {    
     std::list<std::pair<std::string, std::string>> devicesList;

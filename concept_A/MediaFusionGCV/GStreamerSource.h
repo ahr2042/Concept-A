@@ -1,25 +1,8 @@
 #pragma once
 
-#include <gst/gst.h>
-
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#include <string>
-#include <sstream>
-#include <list>
-#include <memory>
-#include <stdexcept>
-#include <map>
-#include <vector>
-#include <iostream>
+#include "PipelineManager.h"
 
 
-#include "SourceType.h"
-#include "errorState.h"
-
-#include "GStreamerSourceCamera.h"
 
 class GStreamerSource {
 public:
