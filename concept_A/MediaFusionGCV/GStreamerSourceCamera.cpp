@@ -3,12 +3,11 @@
 
 GStreamerSourceCamera::GStreamerSourceCamera()
 {
-    int32_t result = getSourceDevices();    
+    int32_t result = getSourceDevices();       
 }
 
 int32_t GStreamerSourceCamera::getSourceDevices()
 {
-    
     GstDeviceMonitor* device_monitor = gst_device_monitor_new();
     if (!device_monitor) {
         return CREATE_DEVICE_MONITOR_ERR;
@@ -70,6 +69,24 @@ void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* 
     devicesContainer.push_back(currentDevice);
 }
 
+gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
+    if (!value) {
+        std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Null value encountered in structure field: " << field_id << std::endl;
+        return TRUE;  // Continue gracefully
+    }
+    gchar* value_str = g_strdup_value_contents(value);
+    const gchar* fieldName = g_quark_to_string(field_id);
+    if (value_str) {
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "        " << fieldName << ": " << value_str << std::endl;
+        g_free(value_str);
+    }
+    else {
+        std::cerr << "  Failed to get value contents for field: " << fieldName << std::endl;
+        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Failed to get value contents for field: " << fieldName << std::endl;
+    }
+    return TRUE;  // Continue iteration
+}
 
 std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
 {    
@@ -110,21 +127,3 @@ std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceI
 }
 
 
-gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
-    if (!value) {
-        std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Null value encountered in structure field: " << field_id << std::endl;
-        return TRUE;  // Continue gracefully
-    }
-    gchar* value_str = g_strdup_value_contents(value);
-    const gchar* fieldName = g_quark_to_string(field_id);
-    if (value_str) {
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "        " << fieldName << ": " << value_str << std::endl;
-        g_free(value_str);
-    }
-    else {
-        std::cerr << "  Failed to get value contents for field: " << fieldName << std::endl;
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Failed to get value contents for field: " << fieldName << std::endl;
-    }
-    return TRUE;  // Continue iteration
-}

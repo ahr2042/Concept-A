@@ -6,6 +6,13 @@
 #include <TargetConditionals.h>
 #endif
 
+#include "SourceType.h"
+#include "errorState.h"
+
+#include "GStreamerSource.h"
+#include "GStreamerSink.h"
+#include "PipelineConfig.h"
+
 #include <string>
 #include <sstream>
 #include <list>
@@ -16,38 +23,29 @@
 #include <iostream>
 
 
-#include "SourceType.h"
-#include "errorState.h"
-
-#include "GStreamerSource.h"
-#include "GStreamerSink.h"
-#include "PipelineConfig.h"
-
-
-
 class PipelineManager {
 public:
     PipelineManager();
     PipelineManager(SourceType );
 
     int32_t getSourceInformation(std::list<std::pair<std::string, std::string>>&);
-    int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
+    //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
     
 
 
 private:
 
     std::vector<GStreamerSource*> mediaSources;
-    std::vector<GStreamerSink*> mediaSinks;
+    //std::vector<GStreamerSink*> mediaSinks;
 
     struct piplineInfo
     {
         SourceType typeOfSource = SourceType::None;
-        int32_t numberOfSources = 0;
+        int32_t numberOfSources = -1;
         std::string sourceName = "";
         std::string sourceCap = "";
 
-        int32_t numberOfSinks = 0;
+        int32_t numberOfSinks = -1;
         std::string sinkName = "";
         std::string sinkCap = "";
     };

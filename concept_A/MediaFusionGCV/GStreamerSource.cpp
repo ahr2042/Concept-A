@@ -5,21 +5,23 @@
 
 
 // Destructor
-GStreamerSource::~GStreamerSource() {
-    if (sourceElement) {
-        gst_object_unref(sourceElement);
-    }
-}
+//GStreamerSource::~GStreamerSource() {
+//    if (sourceElement) {
+//        gst_object_unref(sourceElement);
+//    }
+//}
+//
+//// Public method to get the source element
+//GstElement* GStreamerSource::getSourceElement() {
+//    return sourceElement;
+//}
 
-// Public method to get the source element
-GstElement* GStreamerSource::getSourceElement() {
-    return sourceElement;
-}
-
-
-
-GStreamerSource* GStreamerSource::createElement(std::string deviceName)
+std::list<std::pair<std::string, std::string>> GStreamerSource::getDeviceInfoReadable()
 {
-    
-    return nullptr;
+	return std::list<std::pair<std::string, std::string>>();
+}
+
+int32_t GStreamerSource::getSourceDevices()
+{
+	return 0;
 }

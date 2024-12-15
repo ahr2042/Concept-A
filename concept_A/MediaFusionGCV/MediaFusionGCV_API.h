@@ -14,6 +14,8 @@
 	#endif
 #endif
 
+
+#include <string>
 #include <stdint.h>
 #include "SourceType.h"
 struct deviceProperties
@@ -22,10 +24,7 @@ struct deviceProperties
 	std::string formattedDeviceCapabilities = "";
 };
 
-enum sourceType
-{
-	File, Camera, Network, Screen, Test, Custom
-};
+
 
 #ifdef __cplusplus
 	extern "C" {
@@ -33,7 +32,7 @@ enum sourceType
 	MEDIAFUSIONGCV_API int32_t mediaLib_GStreamerInit(int argc, char* argv[]);
 	MEDIAFUSIONGCV_API int32_t mediaLib_create(SourceType);	
 	MEDIAFUSIONGCV_API int32_t mediaLib_init(int32_t );
-	MEDIAFUSIONGCV_API int32_t mediaLib_getDevices(int32_t, deviceProperties**);
+	MEDIAFUSIONGCV_API int32_t mediaLib_getDevices(int32_t, int32_t&, deviceProperties**);
 	MEDIAFUSIONGCV_API int32_t mediaLib_setDevice(int32_t , int32_t );
 	MEDIAFUSIONGCV_API int32_t mediaLib_startStreaming(int32_t );
 	MEDIAFUSIONGCV_API int32_t mediaLib_stopStreaming(int32_t );

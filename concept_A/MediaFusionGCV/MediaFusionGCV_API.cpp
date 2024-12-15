@@ -10,6 +10,7 @@ std::vector<PipelineManager*> pipelines;
 MEDIAFUSIONGCV_API int32_t mediaLib_GStreamerInit(int argc, char* argv[])
 {
 	gst_init(&argc, &argv);
+	return (int)errorState::NO_ERR;
 }
 
 
@@ -40,26 +41,28 @@ int32_t mediaLib_init(int32_t pipelineId)
 //		enum class SourceType { File, Camera, Network, Screen, Test, Custom };
 // @Para names: 
 // ############################################
-int32_t mediaLib_getDevices(int32_t pipelineId, deviceProperties* sourceDevices)
+int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, deviceProperties** sourceDevices)
 {
 	int32_t result = (int32_t)errorState::NO_ERR;
-	if (sourceDevices != nullptr)
+	if (*sourceDevices != nullptr)
 	{
 		delete[] sourceDevices;
 		sourceDevices = nullptr;
 	}
 	
 	std::list<std::pair<std::string, std::string>> devicesList;
-	result = pipelines[pipelineId]->getSourceInformation(devicesList);
+	result = pipelines[pipelineId]->getSourceInformation(devicesList);	
 	if (result == (int32_t)errorState::NO_ERR)
 	{
-		size_t numberOfDevices = devicesList.size();
-		sourceDevices = new deviceProperties[numberOfDevices];
+		numberOfDevices = devicesList.size();
+		*sourceDevices = new deviceProperties[numberOfDevices];
 		for (int i = 0; i < numberOfDevices; i++)
 		{
 			std::pair<std::string, std::string> device = devicesList.front();
-			sourceDevices[i].deviceName = device.first;
-			sourceDevices[i].formattedDeviceCapabilities = device.second;
+			//memcpy(&(sourceDevices[i].deviceName), device.first.c_str(), device.first.size());
+			//memcpy(&(sourceDevices[i].formattedDeviceCapabilities), device.second.c_str(), device.second.size());
+			sourceDevices[i]->deviceName = device.first;
+			sourceDevices[i]->formattedDeviceCapabilities = device.second;
 			devicesList.pop_front();
 		}
 	}
