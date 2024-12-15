@@ -110,7 +110,7 @@ std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceI
 }
 
 
-gboolean GStreamerSourceCamera::process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
+gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
     if (!value) {
         std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
         ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Null value encountered in structure field: " << field_id << std::endl;

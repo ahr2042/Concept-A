@@ -27,8 +27,7 @@ public:
     virtual int32_t getSourceDevices() {};   
     virtual GStreamerSource* createElement(std::string deviceName) {};
     virtual void addDevicePropertie(std::string, GstCaps*) {};
-    virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable() {};
-    virtual gboolean process_structure_field(GQuark, const GValue*, gpointer) {};
+    virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable() {};    
 
     
 

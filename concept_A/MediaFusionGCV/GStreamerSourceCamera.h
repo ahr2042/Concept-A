@@ -12,7 +12,7 @@ private:
     int32_t getSourceDevices();
     void addDevicePropertie(std::string, GstCaps*);
     std::vector<deviceProperties*> devicesContainer;
-    gboolean process_structure_field(GQuark, const GValue*, gpointer);
+    
 
       
 };
