@@ -43,11 +43,15 @@ int32_t mediaLib_init(int32_t pipelineId)
 // ############################################
 int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, deviceProperties** sourceDevices)
 {
+	if (sourceDevices == nullptr)
+	{
+		return (int32_t)errorState::NULLPTR_ERR;
+	}
 	int32_t result = (int32_t)errorState::NO_ERR;
 	if (*sourceDevices != nullptr)
 	{
-		delete[] sourceDevices;
-		sourceDevices = nullptr;
+		delete[] *sourceDevices;
+		*sourceDevices = nullptr;
 	}
 	
 	std::list<std::pair<std::string, std::string>> devicesList;
@@ -61,8 +65,8 @@ int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, device
 			std::pair<std::string, std::string> device = devicesList.front();
 			//memcpy(&(sourceDevices[i].deviceName), device.first.c_str(), device.first.size());
 			//memcpy(&(sourceDevices[i].formattedDeviceCapabilities), device.second.c_str(), device.second.size());
-			sourceDevices[i]->deviceName = device.first;
-			sourceDevices[i]->formattedDeviceCapabilities = device.second;
+			(*sourceDevices)[i].deviceName = device.first;
+			(*sourceDevices)[i].formattedDeviceCapabilities = device.second;
 			devicesList.pop_front();
 		}
 	}
