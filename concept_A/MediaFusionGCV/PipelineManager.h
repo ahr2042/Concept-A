@@ -31,11 +31,13 @@ public:
     int32_t getSourceInformation(std::list<std::pair<std::string, std::string>>&);
     //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
     
+    int32_t setSourceElement(std::string);
 
 
 private:
-
+    GstElement* pipeline;
     std::vector<GStreamerSource*> mediaSources;
+
     //std::vector<GStreamerSink*> mediaSinks;
 
     struct piplineInfo
@@ -48,9 +50,20 @@ private:
         int32_t numberOfSinks = -1;
         std::string sinkName = "";
         std::string sinkCap = "";
+
+
+    };
+
+    struct _CustomData {
+        GstElement* source;
+        GstElement* convert;
+        GstElement* resample;
+        GstElement* sink;
+        GstElement* pipeline;
     };
 
     piplineInfo pipelineManagerInfo;
+
 
 
 };

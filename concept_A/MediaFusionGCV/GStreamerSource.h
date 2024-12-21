@@ -36,14 +36,16 @@ public:
     virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
     virtual int32_t getSourceDevices();   
-    //virtual GStreamerSource* createElement(std::string deviceName) {};
+    virtual int32_t setSourceElement(std::string) {};
     virtual void addDevicePropertie(std::string, GstCaps*) {};
       
 
     
 
     // GStreamer source element
-    //GstElement* sourceElement;
+    GstElement* sourceElement = nullptr;
+    GstElement* capsFilter = nullptr;
+    GstElement* converter = nullptr;
 
     //// Source configuration
     //SourceType sourceType;

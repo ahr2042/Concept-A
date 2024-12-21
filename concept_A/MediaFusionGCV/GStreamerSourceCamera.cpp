@@ -2,7 +2,14 @@
 #include "GStreamerSourceCamera.h"
 
 GStreamerSourceCamera::GStreamerSourceCamera()
-{
+{    
+#ifdef  _WIN32
+    sourceElement = gst_element_factory_make("mfvideosrc", "camera-source");
+#elif __linux__ 
+    sourceElement = gst_element_factory_make("v4l2src", "camera-source");
+#elif __APPLE__
+    sourceElement = gst_element_factory_make("avfvideosrc", "camera-source");
+#endif     
     int32_t result = getSourceDevices();       
 }
 
@@ -69,6 +76,8 @@ void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* 
     devicesContainer.push_back(currentDevice);
 }
 
+
+
 gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
     if (!value) {
         std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
@@ -127,3 +136,13 @@ std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceI
 }
 
 
+
+int32_t GStreamerSourceCamera::setSourceElement(std::string deviceName)
+{
+    if (sourceElement != nullptr && !deviceName.empty())
+    {
+        g_object_set(sourceElement, "device-name", deviceName.c_str(), NULL);
+        return (int32_t)errorState::NO_ERR;
+    }
+    return (int32_t)errorState::NULLPTR_ERR;
+}

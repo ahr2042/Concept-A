@@ -22,17 +22,23 @@ int32_t mediaLib_create(SourceType chosenType)
 
 int32_t mediaLib_delete(int32_t pipelineId)
 {
-	delete pipelines[pipelineId];
-	pipelines[pipelineId] = nullptr;
+	if (pipelines[pipelineId] != nullptr)
+	{
+		delete pipelines[pipelineId];
+		pipelines[pipelineId] = nullptr;		
+	}	
 	pipelines.erase(pipelines.begin() + pipelineId);
 	return pipelines.size() - 1;
 }
 
 
-int32_t mediaLib_init(int32_t pipelineId)
+int32_t mediaLib_init(int32_t pipelineId, const char* deviceName)
 {
-
-	return (int32_t)errorState::NO_ERR;
+	if (pipelines[pipelineId] != nullptr)
+	{		
+		return pipelines[pipelineId]->setSourceElement(deviceName);
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
 
 }
 // ############################################

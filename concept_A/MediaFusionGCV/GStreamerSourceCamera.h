@@ -13,6 +13,6 @@ private:
     void addDevicePropertie(std::string, GstCaps*);
     std::vector<deviceProperties*> devicesContainer;
     
-
+    int32_t setSourceElement(std::string);
       
 };
