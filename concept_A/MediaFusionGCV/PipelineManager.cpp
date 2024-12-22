@@ -63,3 +63,18 @@ int32_t PipelineManager::setSourceElement(std::string deviceName)
 	}
 	return (int32_t)errorState::NULLPTR_ERR;
 }
+
+
+int32_t PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
+{
+	if (mediaSources[pipelineManagerInfo.numberOfSources] == nullptr)
+	{
+		return (int32_t)errorState::NULLPTR_ERR;
+	}
+	
+	if (mediaSources[pipelineManagerInfo.numberOfSources]->setCapsFilterElement(deviceID, capsIndex) != (int32_t)errorState::NO_ERR)
+	{
+		return (int32_t)errorState::SET_SOURCE_CAPS_ERR;
+	}	
+	return (int32_t)errorState::NO_ERR;
+}

@@ -32,7 +32,7 @@ public:
     //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
     
     int32_t setSourceElement(std::string);
-
+    int32_t setSourceCaps(int32_t, int32_t);
 
 private:
     GstElement* pipeline;
