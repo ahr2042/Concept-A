@@ -163,6 +163,10 @@ int32_t GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t ca
     if (capsFilter != nullptr)
     {
         std::string caps = getCapsStringAtIndex(deviceId, capIndex);
+        if (caps.empty())
+        {
+            return (int32_t)errorState::EMPTY_STRING_ERR;
+        }
         GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
         if (!capsPtr)
         {
