@@ -32,18 +32,22 @@ public:
         GstCaps* deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
     };
-
+    std::vector<deviceProperties*> devicesContainer;
     virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
-    virtual int32_t getSourceDevices();   
-    //virtual GStreamerSource* createElement(std::string deviceName) {};
+    virtual int32_t getSourceDevices() { return 0; };
+    virtual int32_t setSourceElement(std::string) { return 0; };
+    virtual int32_t setConvertElement(std::string) { return 0; };
+    virtual int32_t setCapsFilterElement(int32_t, int32_t) { return 0; };
     virtual void addDevicePropertie(std::string, GstCaps*) {};
       
-
+    std::string getCapsStringAtIndex(int32_t deviceID, guint index);
     
 
     // GStreamer source element
-    //GstElement* sourceElement;
+    GstElement* sourceElement = nullptr;
+    GstElement* capsFilter = nullptr;
+    GstElement* converter = nullptr;
 
     //// Source configuration
     //SourceType sourceType;

@@ -32,16 +32,49 @@ PipelineManager::PipelineManager(SourceType chosenType)
 
 	pipelineManagerInfo.typeOfSource = chosenType;
 	pipelineManagerInfo.numberOfSources++;
+	mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter = gst_element_factory_make("capsfilter", "capsfilter");
+	mediaSources[pipelineManagerInfo.numberOfSources]->converter = gst_element_factory_make("videoconvert", "converter");
 }
 
 int32_t PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
 {
-	int32_t result = errorState::NO_ERR;	
-	devicesList = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable();
-	if (devicesList.empty())
+	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
 	{
-		return NO_VIDEO_DEVICE_FOUND_ERR;
+		devicesList = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable();
+		if (devicesList.empty())
+		{
+			return (int32_t)errorState::NO_VIDEO_DEVICE_FOUND_ERR;
+		}
+		return (int32_t)errorState::NO_ERR;
 	}
+	return (int32_t)errorState::NULLPTR_ERR;
+}
 
-	return result;
+int32_t PipelineManager::setSourceElement(std::string deviceName)
+{
+	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
+	{
+		if (mediaSources[pipelineManagerInfo.numberOfSources]->setSourceElement(deviceName) == (int32_t)errorState::NO_ERR)
+		{
+			pipelineManagerInfo.sourceName = deviceName;
+			return (int32_t)errorState::NO_ERR;
+		}
+		return (int32_t)errorState::SET_SOURCE_ELEMENT_ERR;
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
+}
+
+
+int32_t PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
+{
+	if (mediaSources[pipelineManagerInfo.numberOfSources] == nullptr)
+	{
+		return (int32_t)errorState::NULLPTR_ERR;
+	}
+	
+	if (mediaSources[pipelineManagerInfo.numberOfSources]->setCapsFilterElement(deviceID, capsIndex) != (int32_t)errorState::NO_ERR)
+	{
+		return (int32_t)errorState::SET_SOURCE_CAPS_ERR;
+	}	
+	return (int32_t)errorState::NO_ERR;
 }

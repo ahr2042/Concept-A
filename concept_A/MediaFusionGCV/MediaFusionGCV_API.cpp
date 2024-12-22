@@ -22,17 +22,23 @@ int32_t mediaLib_create(SourceType chosenType)
 
 int32_t mediaLib_delete(int32_t pipelineId)
 {
-	delete pipelines[pipelineId];
-	pipelines[pipelineId] = nullptr;
+	if (pipelines[pipelineId] != nullptr)
+	{
+		delete pipelines[pipelineId];
+		pipelines[pipelineId] = nullptr;		
+	}	
 	pipelines.erase(pipelines.begin() + pipelineId);
 	return pipelines.size() - 1;
 }
 
 
-int32_t mediaLib_init(int32_t pipelineId)
+int32_t mediaLib_init(int32_t pipelineId, const char* deviceName)
 {
-
-	return (int32_t)errorState::NO_ERR;
+	if (pipelines[pipelineId] != nullptr)
+	{		
+		return pipelines[pipelineId]->setSourceElement(deviceName);
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
 
 }
 // ############################################
@@ -63,8 +69,6 @@ int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, device
 		for (int i = 0; i < numberOfDevices; i++)
 		{
 			std::pair<std::string, std::string> device = devicesList.front();
-			//memcpy(&(sourceDevices[i].deviceName), device.first.c_str(), device.first.size());
-			//memcpy(&(sourceDevices[i].formattedDeviceCapabilities), device.second.c_str(), device.second.size());
 			(*sourceDevices)[i].deviceName = device.first;
 			(*sourceDevices)[i].formattedDeviceCapabilities = device.second;
 			devicesList.pop_front();
@@ -74,21 +78,23 @@ int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, device
 
 }
 
-int32_t mediaLib_setDevice(int32_t pipelineId, int32_t deviceId)
+int32_t mediaLib_setDevice(int32_t pipelineId, int32_t deviceID, int32_t capIndex)
 {
-	return (int32_t)errorState::NO_ERR;
+	if (pipelines[pipelineId] != nullptr)
+	{
+		return pipelines[pipelineId]->setSourceCaps(deviceID, capIndex);
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
 
 }
 
 int32_t mediaLib_startStreaming(int32_t pipelineId)
 {
 	return (int32_t)errorState::NO_ERR;
-
 }
 
 int32_t mediaLib_stopStreaming(int32_t pipelineId)
 {
 	return (int32_t)errorState::NO_ERR;
-
 }
 
