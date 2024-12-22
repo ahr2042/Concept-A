@@ -21,7 +21,23 @@ std::list<std::pair<std::string, std::string>> GStreamerSource::getDeviceInfoRea
 	return std::list<std::pair<std::string, std::string>>();
 }
 
-int32_t GStreamerSource::getSourceDevices()
+std::string GStreamerSource::getCapsStringAtIndex(int32_t deviceID, guint index)
 {
-	return 0;
+	if (devicesContainer[deviceID] != nullptr)
+	{
+		const GstStructure* structure = gst_caps_get_structure(devicesContainer[deviceID]->deviceCapabilities, index);
+		// Convert the structure to a string
+		gchar* capsString = gst_structure_to_string(structure);
+		if (!capsString)
+		{
+			return std::string();
+		}
+		std::string result(capsString);
+		g_free(capsString);
+
+		return result;
+	}
+	return std::string();
 }
+
+
