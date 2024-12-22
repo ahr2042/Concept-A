@@ -146,3 +146,26 @@ int32_t GStreamerSourceCamera::setSourceElement(std::string deviceName)
     }
     return (int32_t)errorState::NULLPTR_ERR;
 }
+
+//int32_t GStreamerSourceCamera::setConvertElement(std::string deviceName)
+//{
+//    if (converter != nullptr && !deviceName.empty())
+//    {
+//        g_object_set(converter, "device-name", deviceName.c_str(), NULL);
+//        return (int32_t)errorState::NO_ERR;
+//    }
+//    return (int32_t)errorState::NULLPTR_ERR;
+//}
+
+
+int32_t GStreamerSourceCamera::setCapsFilterElement(std::string caps)
+{
+    if (capsFilter != nullptr && !caps.empty())
+    {
+        GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
+        g_object_set(capsFilter, "caps", capsPtr, NULL);
+        gst_caps_unref(capsPtr);
+        return (int32_t)errorState::NO_ERR;
+    }
+    return (int32_t)errorState::NULLPTR_ERR;
+}

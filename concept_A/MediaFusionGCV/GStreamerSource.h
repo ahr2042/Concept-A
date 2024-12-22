@@ -37,6 +37,8 @@ public:
 
     virtual int32_t getSourceDevices();   
     virtual int32_t setSourceElement(std::string) {};
+    virtual int32_t setConvertElement(std::string) {};
+    virtual int32_t setCapsFilterElement(std::string) {};
     virtual void addDevicePropertie(std::string, GstCaps*) {};
       
 

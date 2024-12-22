@@ -14,5 +14,8 @@ private:
     std::vector<deviceProperties*> devicesContainer;
     
     int32_t setSourceElement(std::string);
+    //int32_t setConvertElement(std::string);
+    int32_t setCapsFilterElement(std::string);
+
       
 };
