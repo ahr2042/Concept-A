@@ -10,7 +10,7 @@ GStreamerSourceCamera::GStreamerSourceCamera()
 #elif __APPLE__
     sourceElement = gst_element_factory_make("avfvideosrc", "camera-source");
 #endif     
-    int32_t result = getSourceDevices();       
+    getSourceDevices();       
 }
 
 int32_t GStreamerSourceCamera::getSourceDevices()
@@ -158,11 +158,16 @@ int32_t GStreamerSourceCamera::setSourceElement(std::string deviceName)
 //}
 
 
-int32_t GStreamerSourceCamera::setCapsFilterElement(std::string caps)
+int32_t GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t capIndex)
 {
-    if (capsFilter != nullptr && !caps.empty())
+    if (capsFilter != nullptr)
     {
+        std::string caps = getCapsStringAtIndex(deviceId, capIndex);
         GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
+        if (!capsPtr)
+        {
+            return (int32_t)errorState::OBJECT_CREATION_ERR;
+        }
         g_object_set(capsFilter, "caps", capsPtr, NULL);
         gst_caps_unref(capsPtr);
         return (int32_t)errorState::NO_ERR;

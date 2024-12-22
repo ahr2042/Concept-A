@@ -11,11 +11,11 @@ private:
     
     int32_t getSourceDevices();
     void addDevicePropertie(std::string, GstCaps*);
-    std::vector<deviceProperties*> devicesContainer;
+    
     
     int32_t setSourceElement(std::string);
     //int32_t setConvertElement(std::string);
-    int32_t setCapsFilterElement(std::string);
+    int32_t setCapsFilterElement(int32_t,int32_t);
 
       
 };
