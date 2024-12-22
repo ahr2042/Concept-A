@@ -33,7 +33,7 @@ struct deviceProperties
 	MEDIAFUSIONGCV_API int32_t mediaLib_create(SourceType);	
 	MEDIAFUSIONGCV_API int32_t mediaLib_init(int32_t, const char*);
 	MEDIAFUSIONGCV_API int32_t mediaLib_getDevices(int32_t, int32_t&, deviceProperties**);
-	MEDIAFUSIONGCV_API int32_t mediaLib_setDevice(int32_t , int32_t );
+	MEDIAFUSIONGCV_API int32_t mediaLib_setDevice(int32_t, int32_t, int32_t);
 	MEDIAFUSIONGCV_API int32_t mediaLib_startStreaming(int32_t );
 	MEDIAFUSIONGCV_API int32_t mediaLib_stopStreaming(int32_t );
 
