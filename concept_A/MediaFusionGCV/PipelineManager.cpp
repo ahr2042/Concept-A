@@ -3,37 +3,59 @@
 
 
 #include "GStreamerSourceCamera.h";
+#include "GStreamerSinkScreen.h"
 
 PipelineManager::PipelineManager()
 {
 
 }
 
-PipelineManager::PipelineManager(SourceType chosenType)
+PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSinkType)
 {
-	switch (chosenType)
+	switch (chosenSourceType)
 	{
-	case File:
+	case SourceType::FILE:
 		break;
-	case Camera:
+	case SourceType::CAMERA:
 		mediaSources.push_back(new GStreamerSourceCamera());
 		break;
-	case Network:
+	case SourceType::NETWORK:
 		break;
-	case Screen:
+	case SourceType::SCREEN:
 		break;
-	case Test:
+	case SourceType::TEST:
 		break;
-	case Custom:
+	case SourceType::CUSTOM:
 		break;
 	default:
 		break;
 	}	
 
-	pipelineManagerInfo.typeOfSource = chosenType;
+	pipelineManagerInfo.typeOfSource = chosenSourceType;
 	pipelineManagerInfo.numberOfSources++;
 	mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter = gst_element_factory_make("capsfilter", "capsfilter");
-	mediaSources[pipelineManagerInfo.numberOfSources]->converter = gst_element_factory_make("videoconvert", "converter");
+	mediaSources[pipelineManagerInfo.numberOfSources]->converter = gst_element_factory_make("videoconvert", "converter");	
+
+	switch (chosenSinkType)
+	{
+	case SinkType::SCREEN:
+		mediaSinks.push_back(new GStreamerSinkScreen);
+		break;
+	case SinkType::FILE:
+		break;
+	case SinkType::NETWORK:
+		break;
+	case SinkType::HARDWARE:
+		break;
+	case SinkType::APPLICATION:
+		break;
+	case SinkType::DEBUGGING_AND_TESTING:
+		break;
+	case SinkType::MEDIA_AND_STREAMING:
+		break;
+	default:
+		break;
+	}
 }
 
 int32_t PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)

@@ -7,6 +7,7 @@
 #endif
 
 #include "SourceType.h"
+#include "SinkType.h"
 #include "errorState.h"
 
 #include "GStreamerSource.h"
@@ -26,7 +27,7 @@
 class PipelineManager {
 public:
     PipelineManager();
-    PipelineManager(SourceType );
+    PipelineManager(SourceType , SinkType);
 
     int32_t getSourceInformation(std::list<std::pair<std::string, std::string>>&);
     //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
@@ -37,12 +38,11 @@ public:
 private:
     GstElement* pipeline;
     std::vector<GStreamerSource*> mediaSources;
-
-    //std::vector<GStreamerSink*> mediaSinks;
+    std::vector<GStreamerSink*> mediaSinks;
 
     struct piplineInfo
     {
-        SourceType typeOfSource = SourceType::None;
+        SourceType typeOfSource = SourceType::NONE;
         int32_t numberOfSources = -1;
         std::string sourceName = "";
         std::string sourceCap = "";
