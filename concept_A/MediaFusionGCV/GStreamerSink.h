@@ -20,7 +20,7 @@
 
 class GStreamerSink{
 public:
-    GStreamerSink() {};    
+    GStreamerSink();    
     struct deviceProperties
     {
         std::string deviceName = "";
@@ -29,12 +29,12 @@ public:
         std::stringstream formattedDeviceCapabilities;
     };
     std::vector<deviceProperties*> devicesContainer;
-    virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
+    //virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
     virtual int32_t getSinkDevices() ;
-    //virtual int32_t setSinkElement(std::string) ;
+    virtual int32_t setSinkElement(std::string) { return 0; };
     //virtual int32_t setConvertElement(std::string) ;
-    //virtual int32_t setCapsFilterElement(int32_t, int32_t) ;
+    virtual int32_t setCapsFilterElement(int32_t, int32_t) { return 0; };
     virtual void addDevicePropertie(std::string, std::string, GstCaps*) ;
 
     //std::string getCapsStringAtIndex(int32_t deviceID, guint index);

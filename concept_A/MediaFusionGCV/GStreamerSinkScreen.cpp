@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "GStreamerSinkScreen.h"
 
 GStreamerSinkScreen::GStreamerSinkScreen(ScreenSinks screenSink)
@@ -20,4 +21,14 @@ GStreamerSinkScreen::GStreamerSinkScreen(ScreenSinks screenSink)
 	default:
 		break;
 	}
+}
+
+int32_t GStreamerSinkScreen::setSinkElement(std::string deviceName)
+{
+	if (sinkElement != nullptr && !deviceName.empty())
+	{
+		g_object_set(sinkElement, "device-name", deviceName.c_str(), NULL);
+		return (int32_t)errorState::NO_ERR;
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
 }

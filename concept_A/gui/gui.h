@@ -3,7 +3,7 @@
 #include <QtWidgets/QMainWindow>
 #include "ui_gui.h"
 
-#include "e_ErrorState.h"
+#include "errorState.h"
 #include "getterLib.h"
 
 
