@@ -21,13 +21,40 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MS_MediaFoundation.h">
+    <ClInclude Include="PipelineManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="e_ErrorState.h">
+    <ClInclude Include="FrameProcessor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="getterLib.h">
+    <ClInclude Include="GStreamerSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GStreamerSink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PipelineConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="errorState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MediaFusionGCV_API.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SourceType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GStreamerSourceCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SinkType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GStreamerSinkScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenSinks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -38,10 +65,22 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MS_MediaFoundation.cpp">
+    <ClCompile Include="GStreamerSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="getterLib.cpp">
+    <ClCompile Include="PipelineManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MediaFusionGCV_API.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSourceCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSinkScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

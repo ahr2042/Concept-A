@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{D92529C0-C380-49DA-BD86-8569AE633D58}</ProjectGuid>
+    <ProjectGuid>{15D8777A-5E48-4B4A-8710-93D4449853F7}</ProjectGuid>
     <Keyword>QtVS_v304</Keyword>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0</WindowsTargetPlatformVersion>
@@ -61,28 +61,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <OutDir>$(SolutionDir)Build\$(Platform)_$(Configuration)\</OutDir>
-    <ExternalIncludePath>..\getterLib;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>..\MediaFusionGCV;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutDir>$(SolutionDir)Build\$(Platform)_$(Configuration)\</OutDir>
-    <ExternalIncludePath>..\getterLib;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ClCompile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-    </ClCompile>
     <Link>
-      <AdditionalDependencies>getterLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\Build\x64_Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)Build\$(Platform)_$(Configuration)\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>MediaFusionGCV.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ClCompile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-    </ClCompile>
     <Link>
-      <AdditionalDependencies>getterLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\Build\x64_Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)Build\$(Platform)_$(Configuration)\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>MediaFusionGCV.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -95,7 +88,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <QtMoc>
@@ -124,10 +117,10 @@
     </QtMoc>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <QtRcc Include="gui.qrc" />
-    <QtUic Include="gui.ui" />
-    <QtMoc Include="gui.h" />
-    <ClCompile Include="gui.cpp" />
+    <QtRcc Include="GuiMediaFusion.qrc" />
+    <QtUic Include="GuiMediaFusion.ui" />
+    <QtMoc Include="GuiMediaFusion.h" />
+    <ClCompile Include="GuiMediaFusion.cpp" />
     <ClCompile Include="main.cpp" />
     <ClInclude Include="stdafx.h" />
     <ClCompile Include="stdafx.cpp">

@@ -23,16 +23,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="gui.qrc">
+    <QtRcc Include="GuiMediaFusion.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
-    <QtUic Include="gui.ui">
+    <QtUic Include="GuiMediaFusion.ui">
       <Filter>Form Files</Filter>
     </QtUic>
-    <QtMoc Include="gui.h">
+    <QtMoc Include="GuiMediaFusion.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <ClCompile Include="gui.cpp">
+    <ClCompile Include="GuiMediaFusion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClInclude Include="stdafx.h">
