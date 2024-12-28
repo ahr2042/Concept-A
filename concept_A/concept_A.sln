@@ -3,13 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gui", "gui\gui.vcxproj", "{D92529C0-C380-49DA-BD86-8569AE633D58}"
-	ProjectSection(ProjectDependencies) = postProject
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE} = {BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MFgetterLib", "MFgetterLib\getterLib.vcxproj", "{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MediaFusionGCV", "MediaFusionGCV\MediaFusionGCV.vcxproj", "{8D2BD5AA-590C-40CB-8E74-E2386431F4DB}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GuiMediaFusion", "GuiMediaFusion\GuiMediaFusion.vcxproj", "{15D8777A-5E48-4B4A-8710-93D4449853F7}"
@@ -25,22 +18,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Debug|x64.ActiveCfg = Debug|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Debug|x64.Build.0 = Debug|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Debug|x86.ActiveCfg = Debug|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Debug|x86.Build.0 = Debug|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Release|x64.ActiveCfg = Release|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Release|x64.Build.0 = Release|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Release|x86.ActiveCfg = Release|x64
-		{D92529C0-C380-49DA-BD86-8569AE633D58}.Release|x86.Build.0 = Release|x64
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Debug|x64.ActiveCfg = Debug|x64
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Debug|x64.Build.0 = Debug|x64
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Debug|x86.ActiveCfg = Debug|Win32
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Debug|x86.Build.0 = Debug|Win32
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Release|x64.ActiveCfg = Release|x64
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Release|x64.Build.0 = Release|x64
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Release|x86.ActiveCfg = Release|Win32
-		{BD0F3430-F07B-4164-B1A5-F9F7BE4898EE}.Release|x86.Build.0 = Release|Win32
 		{8D2BD5AA-590C-40CB-8E74-E2386431F4DB}.Debug|x64.ActiveCfg = Debug|x64
 		{8D2BD5AA-590C-40CB-8E74-E2386431F4DB}.Debug|x64.Build.0 = Debug|x64
 		{8D2BD5AA-590C-40CB-8E74-E2386431F4DB}.Debug|x86.ActiveCfg = Debug|Win32

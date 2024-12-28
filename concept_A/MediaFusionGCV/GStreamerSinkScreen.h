@@ -6,7 +6,8 @@
 class GStreamerSinkScreen : public GStreamerSink
 {
 public:
-	GStreamerSinkScreen() { GStreamerSinkScreen(ScreenSinks::AUTOVIDEOSINK); };
 	GStreamerSinkScreen(ScreenSinks);
 private:
+	int32_t setSinkElement(std::string);
+
 };

@@ -5,27 +5,25 @@
 #include "GStreamerSourceCamera.h";
 #include "GStreamerSinkScreen.h"
 
-PipelineManager::PipelineManager()
-{
 
-}
-
-PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSinkType)
+PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName = "pipeline")
 {
+	pipeline = gst_pipeline_new(pipelineName);
+
 	switch (chosenSourceType)
 	{
-	case SourceType::FILE:
+	case SourceType::FILE_SOURCE:
 		break;
-	case SourceType::CAMERA:
+	case SourceType::CAMERA_SOURCE:
 		mediaSources.push_back(new GStreamerSourceCamera());
 		break;
-	case SourceType::NETWORK:
+	case SourceType::NETWORK_SOURCE:
 		break;
-	case SourceType::SCREEN:
+	case SourceType::SCREEN_SOURCE:
 		break;
-	case SourceType::TEST:
+	case SourceType::TEST_SOURCE:
 		break;
-	case SourceType::CUSTOM:
+	case SourceType::CUSTOM_SOURCE:
 		break;
 	default:
 		break;
@@ -33,29 +31,41 @@ PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSin
 
 	pipelineManagerInfo.typeOfSource = chosenSourceType;
 	pipelineManagerInfo.numberOfSources++;
+	pipelineManagerInfo.numberOfSinks++;
 	mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter = gst_element_factory_make("capsfilter", "capsfilter");
 	mediaSources[pipelineManagerInfo.numberOfSources]->converter = gst_element_factory_make("videoconvert", "converter");	
 
 	switch (chosenSinkType)
 	{
-	case SinkType::SCREEN:
-		mediaSinks.push_back(new GStreamerSinkScreen);
+	case SinkType::SCREEN_SINK:
+		mediaSinks.push_back(new GStreamerSinkScreen(ScreenSinks::AUTOVIDEOSINK));
 		break;
-	case SinkType::FILE:
+	case SinkType::FILE_SINK:
 		break;
-	case SinkType::NETWORK:
+	case SinkType::NETWORK_SINK:
 		break;
-	case SinkType::HARDWARE:
+	case SinkType::HARDWARE_SINK:
 		break;
-	case SinkType::APPLICATION:
+	case SinkType::APPLICATION_SINK:
 		break;
-	case SinkType::DEBUGGING_AND_TESTING:
+	case SinkType::DEBUGGING_AND_TESTING_SINK:
 		break;
-	case SinkType::MEDIA_AND_STREAMING:
+	case SinkType::MEDIA_AND_STREAMING_SINK:
 		break;
 	default:
 		break;
 	}
+
+	if (!pipeline 
+		|| !mediaSinks[pipelineManagerInfo.numberOfSinks]->sinkElement
+		|| !mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter 	
+		|| !mediaSources[pipelineManagerInfo.numberOfSources]->converter
+		|| !mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement
+		) 
+	{
+		g_error("Failed to create elements");		
+	}
+
 }
 
 int32_t PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
@@ -78,7 +88,7 @@ int32_t PipelineManager::setSourceElement(std::string deviceName)
 	{
 		if (mediaSources[pipelineManagerInfo.numberOfSources]->setSourceElement(deviceName) == (int32_t)errorState::NO_ERR)
 		{
-			pipelineManagerInfo.sourceName = deviceName;
+			pipelineManagerInfo.sourceName = deviceName;			
 			return (int32_t)errorState::NO_ERR;
 		}
 		return (int32_t)errorState::SET_SOURCE_ELEMENT_ERR;
@@ -99,4 +109,84 @@ int32_t PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
 		return (int32_t)errorState::SET_SOURCE_CAPS_ERR;
 	}	
 	return (int32_t)errorState::NO_ERR;
+}
+
+int32_t PipelineManager::setSinkElement(std::string deviceName)
+{
+	if (mediaSinks[pipelineManagerInfo.numberOfSinks] != nullptr)
+	{
+		if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setSinkElement(deviceName) == (int32_t)errorState::NO_ERR)
+		{
+			pipelineManagerInfo.sinkName = deviceName;
+			return (int32_t)errorState::NO_ERR;
+		}
+		return (int32_t)errorState::SET_SINK_ELEMENT_ERR;
+	}
+	return (int32_t)errorState::NULLPTR_ERR;
+}
+
+int32_t PipelineManager::setSinkCaps(int32_t deviceID, int32_t capsIndex)
+{
+	if (mediaSinks[pipelineManagerInfo.numberOfSinks] == nullptr)
+	{
+		return (int32_t)errorState::NULLPTR_ERR;
+	}
+
+	if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setCapsFilterElement(deviceID, capsIndex) != (int32_t)errorState::NO_ERR)
+	{
+		return (int32_t)errorState::SET_SINK_CAPS_ERR;
+	}
+	return (int32_t)errorState::NO_ERR;
+}
+
+int32_t PipelineManager::startStreaming()
+{
+	int32_t result = buildPipeline();
+	if (result == (int32_t)errorState::NO_ERR)
+	{
+		pipleineThread = g_thread_new("pipleineThread", startLoop, this);
+		//GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+		//if (ret == GST_STATE_CHANGE_FAILURE) {
+		//	std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
+		//	gst_object_unref(pipeline);
+		//	return (int32_t)errorState::START_STREAMING_FAILED;
+		//}
+		return (int32_t)errorState::NO_ERR;
+	}
+	return result;
+}
+
+int32_t PipelineManager::stopStreaming()
+{
+	g_thread_exit(pipleineThread);	
+	GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
+	if (ret == GST_STATE_CHANGE_FAILURE) {
+		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
+		gst_object_unref(pipeline);
+		return (int32_t)errorState::STOP_STREAMING_FAILED;
+	}
+	return (int32_t)errorState::NO_ERR;
+}
+
+int32_t PipelineManager::buildPipeline()
+{
+	gst_bin_add_many(GST_BIN(pipeline), mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL);
+    if (!gst_element_link_many(mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL)) {
+        g_error("Failed to link elements");
+        gst_object_unref(pipeline);
+        return (int32_t)errorState::BUILD_PIPELINE_FAILED;
+    }
+	return (int32_t)errorState::NO_ERR;
+}
+
+gpointer PipelineManager::startLoop(gpointer data)
+{
+	GstStateChangeReturn ret = gst_element_set_state(((PipelineManager*)data)->pipeline, GST_STATE_PLAYING);
+	if (ret == GST_STATE_CHANGE_FAILURE) {
+		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
+		gst_object_unref(((PipelineManager*)data)->pipeline);
+		return data;
+	}	
+	GMainLoop* loop = g_main_loop_new(NULL, FALSE);
+	g_main_loop_run(loop);	
 }

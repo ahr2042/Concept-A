@@ -7,7 +7,7 @@
 int main(int argc, char *argv[])
 {
     mediaLib_GStreamerInit(argc, argv);
-    int32_t objectID = mediaLib_create(Camera);
+    int32_t objectID = mediaLib_create(SourceType::CAMERA_SOURCE, SCREEN_SINK, "pipeline");
     deviceProperties* foundDevices = nullptr;
     int32_t numberOfDevices = 0;
     int32_t result = mediaLib_getDevices(objectID, numberOfDevices, &foundDevices);
@@ -19,6 +19,15 @@ int main(int argc, char *argv[])
             std::cout << foundDevices[i].deviceName << std::endl << foundDevices[i].formattedDeviceCapabilities << std::endl;
         }
     }
+
+    mediaLib_setDevice(objectID, objectID, 0);
+    mediaLib_startStreaming(objectID);
+    while (true)
+    {
+
+    }
+
+
     
     return 0;
     //QApplication a(argc, argv);
