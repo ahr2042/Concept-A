@@ -1,0 +1,10 @@
+#pragma once
+enum ScreenSinks
+{
+	AUTOVIDEOSINK,
+	XVIMAGESINK,
+	GLIMAGESINK,
+	WAYLANDSINK,
+	CACASINK,
+	QT5GLSINK
+};

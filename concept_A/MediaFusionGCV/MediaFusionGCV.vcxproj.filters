@@ -48,6 +48,15 @@
     <ClInclude Include="GStreamerSourceCamera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SinkType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GStreamerSinkScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenSinks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -66,6 +75,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GStreamerSourceCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GStreamerSinkScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

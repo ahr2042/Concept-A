@@ -163,16 +163,21 @@
     <ClInclude Include="FrameProcessor.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GStreamerSink.h" />
+    <ClInclude Include="GStreamerSinkScreen.h" />
     <ClInclude Include="GStreamerSource.h" />
     <ClInclude Include="GStreamerSourceCamera.h" />
     <ClInclude Include="MediaFusionGCV_API.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PipelineConfig.h" />
     <ClInclude Include="PipelineManager.h" />
+    <ClInclude Include="ScreenSinks.h" />
+    <ClInclude Include="SinkType.h" />
     <ClInclude Include="SourceType.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="GStreamerSink.cpp" />
+    <ClCompile Include="GStreamerSinkScreen.cpp" />
     <ClCompile Include="GStreamerSource.cpp" />
     <ClCompile Include="GStreamerSourceCamera.cpp" />
     <ClCompile Include="MediaFusionGCV_API.cpp" />
