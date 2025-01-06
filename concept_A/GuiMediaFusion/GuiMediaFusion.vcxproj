@@ -121,7 +121,9 @@
     <QtUic Include="GuiMediaFusion.ui" />
     <QtMoc Include="GuiMediaFusion.h" />
     <ClCompile Include="GuiMediaFusion.cpp" />
+    <ClCompile Include="GuiMediaFusionController.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClInclude Include="GuiMediaFusionController.h" />
     <ClInclude Include="stdafx.h" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">Create</PrecompiledHeader>
