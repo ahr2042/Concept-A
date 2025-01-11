@@ -13,6 +13,9 @@ public:
     ~GuiMediaFusion();    
     
 
+public slots:
+    void handleUserInput();
+
 signals:
     void guiRequest(QString);
 
