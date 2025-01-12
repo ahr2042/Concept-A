@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "GuiMediaFusionController.h"
 
 GuiMediaFusionController::GuiMediaFusionController()
