@@ -54,5 +54,11 @@
     <ClInclude Include="GuiMediaFusionController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="comboboxes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="errorStateGui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
