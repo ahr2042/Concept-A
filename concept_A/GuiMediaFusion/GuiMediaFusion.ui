@@ -1,4 +1,5 @@
-<UI version="4.0">
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
  <class>GuiMediaFusionClass</class>
  <widget class="QMainWindow" name="GuiMediaFusionClass">
   <property name="geometry">
@@ -31,7 +32,7 @@
        <height>841</height>
       </rect>
      </property>
-     <widget class="QPushButton" name="pushButton">
+     <widget class="QPushButton" name="pushButton_1">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -70,7 +71,7 @@
        <string>PushButton</string>
       </property>
      </widget>
-     <widget class="QComboBox" name="sources">
+     <widget class="QComboBox" name="sourcesCombobox">
       <property name="geometry">
        <rect>
         <x>100</x>
@@ -80,7 +81,7 @@
        </rect>
       </property>
      </widget>
-     <widget class="QComboBox" name="sourceCaps">
+     <widget class="QComboBox" name="sourceCapsComboBox">
       <property name="geometry">
        <rect>
         <x>100</x>
@@ -116,7 +117,7 @@
        <string>Capabilities</string>
       </property>
      </widget>
-     <widget class="QComboBox" name="sinks">
+     <widget class="QComboBox" name="sinksComboBox">
       <property name="geometry">
        <rect>
         <x>100</x>
@@ -126,7 +127,7 @@
        </rect>
       </property>
      </widget>
-     <widget class="QComboBox" name="sinkCaps">
+     <widget class="QComboBox" name="sinkCapsComboBox">
       <property name="geometry">
        <rect>
         <x>100</x>
@@ -190,4 +191,4 @@
   <include location="GuiMediaFusion.qrc"/>
  </resources>
  <connections/>
-</UI>
+</ui>
