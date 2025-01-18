@@ -3,7 +3,7 @@
 #include <QtWidgets/QMainWindow>
 #include "ui_GuiMediaFusion.h"
 #include "errorStateGui.h"
-
+#include "comboboxes.h"
 
 class GuiMediaFusion : public QMainWindow
 {
@@ -13,7 +13,7 @@ public:
     GuiMediaFusion(QWidget *parent = nullptr);
     ~GuiMediaFusion();    
     
-    errorStateGui setSourcesCombobox(QStringList);
+    errorStateGui setCombobox(COMBOBOXES, QStringList);
 
 public slots:
     void handleUserInput();
