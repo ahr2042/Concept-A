@@ -46,3 +46,9 @@ concept_A/singularity/.vs
 /concept_A/MediaFusionGCV/x64/Debug
 /concept_A/GuiMediaFusion/x64/Debug
 
+/concept_A/GuiMediaFusion/x64/Release/GuiMediaFusion.tlog
+/concept_A/GuiMediaFusion/x64/Release/qt/moc
+/concept_A/GuiMediaFusion/x64/Release/qt/qmake
+/concept_A/GuiMediaFusion/x64/Release/qt/rcc
+/concept_A/GuiMediaFusion/x64/Release/qt/uic
+/concept_A/GuiMediaFusion/x64/Release/qt

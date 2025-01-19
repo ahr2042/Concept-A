@@ -1,0 +1,8 @@
+#pragma once
+enum COMBOBOXES
+{
+	SOURCES,
+	SOURCE_CAPS,
+	SINKS,
+	SINK_CAPS
+};
