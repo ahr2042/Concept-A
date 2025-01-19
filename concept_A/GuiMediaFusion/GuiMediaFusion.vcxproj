@@ -125,7 +125,7 @@
     <ClCompile Include="main.cpp" />
     <ClInclude Include="comboboxes.h" />
     <ClInclude Include="errorStateGui.h" />
-    <ClInclude Include="GuiMediaFusionController.h" />
+    <QtMoc Include="GuiMediaFusionController.h" />
     <ClInclude Include="stdafx.h" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">Create</PrecompiledHeader>
