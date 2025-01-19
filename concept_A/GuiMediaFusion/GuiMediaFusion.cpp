@@ -70,8 +70,8 @@ errorStateGui GuiMediaFusion::getCombobox(COMBOBOXES comboboxName, int& selected
 void GuiMediaFusion::handleUserInput()
 {
     QString buttonName = QObject::sender()->objectName();
-    if (buttonName == "sourcesCombobox")
+    if (buttonName.endsWith("Combobox",Qt::CaseInsensitive))
     {
-
+        emit guiManagementViewRequest(buttonName);
     }
 }
