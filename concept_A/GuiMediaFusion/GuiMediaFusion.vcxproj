@@ -71,12 +71,18 @@
       <AdditionalLibraryDirectories>$(SolutionDir)Build\$(Platform)_$(Configuration)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>MediaFusionGCV.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)Build\$(Platform)_$(Configuration)\</AdditionalLibraryDirectories>
       <AdditionalDependencies>MediaFusionGCV.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
