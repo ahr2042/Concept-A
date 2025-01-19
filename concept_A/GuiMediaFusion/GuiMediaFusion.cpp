@@ -43,6 +43,29 @@ errorStateGui GuiMediaFusion::setCombobox(COMBOBOXES comboboxName, QStringList c
     return errorStateGui::NO_ERR;
 }
 
+errorStateGui GuiMediaFusion::getCombobox(COMBOBOXES comboboxName, int& selectedIndex)
+{
+    switch (comboboxName)
+    {
+    case SOURCES:
+        selectedIndex = ui.sourcesCombobox->currentIndex();
+        break;
+    case SOURCE_CAPS:
+        selectedIndex = ui.sourceCapsComboBox->currentIndex();
+        break;
+    case SINKS:
+        selectedIndex = ui.sinksComboBox->currentIndex();
+        break;
+    case SINK_CAPS:
+        selectedIndex = ui.sinkCapsComboBox->currentIndex();
+        break;
+    default:
+        return errorStateGui::GET_COMBOBOX_ERR;
+        break;
+    }    
+    return errorStateGui::NO_ERR;
+}
+
 
 void GuiMediaFusion::handleUserInput()
 {

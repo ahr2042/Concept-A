@@ -14,6 +14,7 @@ public:
     ~GuiMediaFusion();    
     
     errorStateGui setCombobox(COMBOBOXES, QStringList);
+    errorStateGui getCombobox(COMBOBOXES, int&);
 
 public slots:
     void handleUserInput();
