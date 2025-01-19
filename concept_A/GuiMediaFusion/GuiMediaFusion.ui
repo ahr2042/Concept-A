@@ -190,5 +190,73 @@
  <resources>
   <include location="GuiMediaFusion.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>sourcesCombobox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>GuiMediaFusionClass</receiver>
+   <slot>handleUserInput()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>204</x>
+     <y>118</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>225</x>
+     <y>-8</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sourceCapsComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>GuiMediaFusionClass</receiver>
+   <slot>handleUserInput()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>153</x>
+     <y>160</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>170</x>
+     <y>-17</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sinksComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>GuiMediaFusionClass</receiver>
+   <slot>handleUserInput()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>195</x>
+     <y>194</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>188</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sinkCapsComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>GuiMediaFusionClass</receiver>
+   <slot>handleUserInput()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>226</x>
+     <y>239</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>351</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>handleUserInput()</slot>
+ </slots>
 </ui>
