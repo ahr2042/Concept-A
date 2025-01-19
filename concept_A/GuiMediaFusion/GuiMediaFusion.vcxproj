@@ -122,10 +122,12 @@
     <QtMoc Include="GuiMediaFusion.h" />
     <ClCompile Include="GuiMediaFusion.cpp" />
     <ClCompile Include="GuiMediaFusionController.cpp" />
+    <ClCompile Include="GuiMediaFusionModel.cpp" />
     <ClCompile Include="main.cpp" />
     <ClInclude Include="comboboxes.h" />
     <ClInclude Include="errorStateGui.h" />
     <QtMoc Include="GuiMediaFusionController.h" />
+    <QtMoc Include="GuiMediaFusionModel.h" />
     <ClInclude Include="stdafx.h" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">Create</PrecompiledHeader>

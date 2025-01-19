@@ -49,6 +49,9 @@
     <ClCompile Include="GuiMediaFusionController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GuiMediaFusionModel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="comboboxes.h">
@@ -60,6 +63,9 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="GuiMediaFusionController.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="GuiMediaFusionModel.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>
