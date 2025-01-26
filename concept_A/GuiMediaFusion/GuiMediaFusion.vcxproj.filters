@@ -54,10 +54,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="comboboxes.h">
+    <ClInclude Include="errorStateGui.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="errorStateGui.h">
+    <ClInclude Include="guiElements.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

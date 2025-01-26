@@ -1,14 +1,6 @@
 #include "stdafx.h"
 #include "GuiMediaFusionController.h"
 
-
-#include "GuiMediaFusion.h"
-#include <QtWidgets/QApplication>
-#include "MediaFusionGCV_API.h"
-#include <iostream>
-
-
-
 //#include <QtWidgets/QApplication>
 //#include "MediaFusionGCV_API.h"
 //#include <iostream>
