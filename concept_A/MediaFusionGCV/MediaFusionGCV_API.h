@@ -17,8 +17,7 @@
 
 #include <string>
 #include <stdint.h>
-#include "SourceType.h"
-#include "SinkType.h"
+
 
 struct deviceProperties
 {
@@ -31,6 +30,12 @@ struct deviceProperties
 #ifdef __cplusplus
 	extern "C" {
 #endif
+
+#include "SourceType.h"
+#include "SinkType.h"
+
+
+
 	MEDIAFUSIONGCV_API int32_t mediaLib_GStreamerInit(int argc, char* argv[]);
 	MEDIAFUSIONGCV_API int32_t mediaLib_create(SourceType, SinkType, const char*);
 	MEDIAFUSIONGCV_API int32_t mediaLib_init(int32_t, const char*, const char*);

@@ -1,7 +1,7 @@
 #pragma once
-enum errorState
+enum errorState : int
 {
-	ERR = -(1 << 7),
+	ERR = INT_MIN,
 	NOT_IMPLEMENTED_YET_ERR,
 	UNDEFINED_DEVICE_TYPE_ID_ERR,
 	CREATE_DEVICE_MONITOR_ERR,
