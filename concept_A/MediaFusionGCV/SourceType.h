@@ -1,6 +1,6 @@
 #pragma once
 
-enum SourceType
+enum SourceType : int
 {    
     NONE_SOURCE,
     FILE_SOURCE,

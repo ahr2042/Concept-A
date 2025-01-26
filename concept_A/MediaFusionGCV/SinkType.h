@@ -1,5 +1,5 @@
 #pragma once
-enum SinkType
+enum SinkType : int
 {
 	SCREEN_SINK,
 	FILE_SINK,

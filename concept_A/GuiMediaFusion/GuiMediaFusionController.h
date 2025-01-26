@@ -8,10 +8,11 @@ class GuiMediaFusionController : public QObject
 	Q_OBJECT
 public:
 	GuiMediaFusionController();
+	GuiMediaFusionController(int mainArgc, char* mainArgv[]);
 	~GuiMediaFusionController();
 
 public slots:
-	void handleViewRequest(QString);
+	void handleViewRequest(GUI_ELEMENTS);
 
 
 private:
@@ -20,5 +21,8 @@ private:
 
 	errorStateGui connectToView();
 	errorStateGui connectToModel();
+
+	int argc = 0;
+	char** argv;
 
 };

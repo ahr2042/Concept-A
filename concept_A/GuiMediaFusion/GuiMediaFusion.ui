@@ -32,7 +32,7 @@
        <height>841</height>
       </rect>
      </property>
-     <widget class="QPushButton" name="pushButton_1">
+     <widget class="QPushButton" name="turnOnPushButton">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -42,10 +42,10 @@
        </rect>
       </property>
       <property name="text">
-       <string>PushButton</string>
+       <string>Turn on</string>
       </property>
      </widget>
-     <widget class="QPushButton" name="pushButton_2">
+     <widget class="QPushButton" name="initPushButton">
       <property name="geometry">
        <rect>
         <x>100</x>
@@ -55,7 +55,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>PushButton</string>
+       <string>Init</string>
       </property>
      </widget>
      <widget class="QPushButton" name="pushButton_3">

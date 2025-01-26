@@ -10,7 +10,7 @@ GuiMediaFusion::GuiMediaFusion(QWidget *parent)
 GuiMediaFusion::~GuiMediaFusion()
 {}
 
-errorStateGui GuiMediaFusion::setCombobox(COMBOBOXES comboboxName, QStringList contentsList)
+errorStateGui GuiMediaFusion::setCombobox(GUI_ELEMENTS comboboxName, QStringList contentsList)
 {    
     QComboBox* selectedCombobox = nullptr;
     switch (comboboxName)
@@ -43,7 +43,7 @@ errorStateGui GuiMediaFusion::setCombobox(COMBOBOXES comboboxName, QStringList c
     return errorStateGui::NO_ERR;
 }
 
-errorStateGui GuiMediaFusion::getCombobox(COMBOBOXES comboboxName, int& selectedIndex)
+errorStateGui GuiMediaFusion::getCombobox(GUI_ELEMENTS comboboxName, int& selectedIndex)
 {
     switch (comboboxName)
     {
@@ -69,9 +69,29 @@ errorStateGui GuiMediaFusion::getCombobox(COMBOBOXES comboboxName, int& selected
 
 void GuiMediaFusion::handleUserInput()
 {
-    QString buttonName = QObject::sender()->objectName();
-    if (buttonName.endsWith("Combobox",Qt::CaseInsensitive))
+    QString pressedButtonName = QObject::sender()->objectName();    
+    if (pressedButtonName == ui.turnOnPushButton->objectName())
     {
-        emit guiManagementViewRequest(buttonName);
+        emit viewClassRequest(GUI_ELEMENTS::TURN_ON);
+    }
+    else if (pressedButtonName == ui.initPushButton->objectName())
+    {
+        emit viewClassRequest(GUI_ELEMENTS::INIT);
+    }
+    else if (pressedButtonName == ui.sourcesCombobox->objectName())
+    {
+        emit viewClassRequest(GUI_ELEMENTS::SOURCES);
+    }
+    else if (pressedButtonName == ui.sourceCapsComboBox->objectName())
+    {
+        emit viewClassRequest(GUI_ELEMENTS::SOURCE_CAPS);
+    }
+    else if (pressedButtonName == ui.sinksComboBox->objectName())
+    {
+        emit viewClassRequest(GUI_ELEMENTS::SINKS);
+    }
+    else if (pressedButtonName == ui.sinkCapsComboBox->objectName())
+    {
+        emit viewClassRequest(GUI_ELEMENTS::SINK_CAPS);
     }
 }

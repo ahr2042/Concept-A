@@ -1,6 +1,8 @@
 #pragma once
-enum COMBOBOXES
+enum GUI_ELEMENTS
 {
+	TURN_ON,
+	INIT,
 	SOURCES,
 	SOURCE_CAPS,
 	SINKS,
