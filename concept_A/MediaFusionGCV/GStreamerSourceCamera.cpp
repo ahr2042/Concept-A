@@ -100,7 +100,7 @@ gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer 
 std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
 {    
     std::list<std::pair<std::string, std::string>> devicesList;
-    int totalDevicesNumebr = devicesContainer.size();
+    size_t totalDevicesNumebr = devicesContainer.size();
     for (int deviceId = 0; deviceId < totalDevicesNumebr; deviceId++)
     {
         if (devicesContainer[deviceId] == nullptr)

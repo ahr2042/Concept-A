@@ -13,13 +13,13 @@ errorState mediaLib_GStreamerInit(int argc, char* argv[])
 	return errorState::NO_ERR;
 }
 
-int32_t mediaLib_create(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName)
+size_t mediaLib_create(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName)
 {
 	pipelines.push_back(new PipelineManager(chosenSourceType, chosenSinkType, pipelineName));
 	return pipelines.size() -1;
 }
 
-int32_t mediaLib_delete(int32_t pipelineId)
+size_t mediaLib_delete(int32_t pipelineId)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{
@@ -50,7 +50,7 @@ errorState mediaLib_init(int32_t pipelineId, const char* sourceName, const char*
 //		enum class SourceType { File, Camera, Network, Screen, Test, Custom };
 // @Para names: 
 // ############################################
-errorState mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, deviceProperties** sourceDevices)
+errorState mediaLib_getDevices(int32_t pipelineId, size_t& numberOfDevices, deviceProperties** sourceDevices)
 {
 	if (sourceDevices == nullptr)
 	{
