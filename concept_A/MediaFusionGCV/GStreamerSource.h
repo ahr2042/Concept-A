@@ -35,10 +35,10 @@ public:
     std::vector<deviceProperties*> devicesContainer;
     virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
-    virtual int32_t getSourceDevices() { return 0; };
-    virtual int32_t setSourceElement(std::string) { return 0; };
-    virtual int32_t setConvertElement(std::string) { return 0; };
-    virtual int32_t setCapsFilterElement(int32_t, int32_t) { return 0; };
+    virtual errorState getSourceDevices() { return errorState::NO_ERR; };
+    virtual errorState setSourceElement(std::string) { return errorState::NO_ERR; };
+    virtual errorState setConvertElement(std::string) { return errorState::NO_ERR; };
+    virtual errorState setCapsFilterElement(int32_t, int32_t) { return errorState::NO_ERR; };
     virtual void addDevicePropertie(std::string, GstCaps*) {};
       
     std::string getCapsStringAtIndex(int32_t deviceID, guint index);

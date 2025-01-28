@@ -11,7 +11,7 @@ GuiMediaFusionModel::~GuiMediaFusionModel()
 
 errorStateGui GuiMediaFusionModel::initGstreamer(int argc, char** argv)
 {
-	if (mediaLib_GStreamerInit(argc, argv) != errorStateGui::NO_ERR)
+	if (mediaLib_GStreamerInit(argc, argv) != errorState::NO_ERR)
 	{
 
 	}

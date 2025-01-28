@@ -1,5 +1,5 @@
 #pragma once
-enum GUI_ELEMENTS
+enum GUI_ELEMENTS : int32_t
 {
 	TURN_ON,
 	INIT,

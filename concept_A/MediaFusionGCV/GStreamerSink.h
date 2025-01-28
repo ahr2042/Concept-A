@@ -31,10 +31,10 @@ public:
     std::vector<deviceProperties*> devicesContainer;
     //virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
-    virtual int32_t getSinkDevices() ;
-    virtual int32_t setSinkElement(std::string) { return 0; };
+    virtual errorState getSinkDevices() ;
+    virtual errorState setSinkElement(std::string) { return errorState::NO_ERR; };
     //virtual int32_t setConvertElement(std::string) ;
-    virtual int32_t setCapsFilterElement(int32_t, int32_t) { return 0; };
+    virtual errorState setCapsFilterElement(int32_t, int32_t) { return errorState::NO_ERR; };
     virtual void addDevicePropertie(std::string, std::string, GstCaps*) ;
 
     //std::string getCapsStringAtIndex(int32_t deviceID, guint index);

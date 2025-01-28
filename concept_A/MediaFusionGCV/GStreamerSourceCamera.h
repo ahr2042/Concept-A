@@ -9,13 +9,13 @@ public:
 
 private:
     
-    int32_t getSourceDevices();
+    errorState getSourceDevices();
     void addDevicePropertie(std::string, GstCaps*);
     
     
-    int32_t setSourceElement(std::string);
+    errorState setSourceElement(std::string);
     //int32_t setConvertElement(std::string);
-    int32_t setCapsFilterElement(int32_t,int32_t);
+    errorState setCapsFilterElement(int32_t,int32_t);
 
       
 };
