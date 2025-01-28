@@ -1,5 +1,5 @@
 #pragma once
-enum ScreenSinks
+enum ScreenSinks : int32_t
 {
 	AUTOVIDEOSINK,
 	XVIMAGESINK,

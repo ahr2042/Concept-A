@@ -7,10 +7,10 @@
 std::vector<PipelineManager*> pipelines;
 
 
- int32_t mediaLib_GStreamerInit(int argc, char* argv[])
+errorState mediaLib_GStreamerInit(int argc, char* argv[])
 {
 	gst_init(&argc, &argv);
-	return (int)errorState::NO_ERR;
+	return errorState::NO_ERR;
 }
 
 int32_t mediaLib_create(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName)
@@ -31,18 +31,18 @@ int32_t mediaLib_delete(int32_t pipelineId)
 }
 
 
-int32_t mediaLib_init(int32_t pipelineId, const char* sourceName, const char* sinkName)
+errorState mediaLib_init(int32_t pipelineId, const char* sourceName, const char* sinkName)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{		
-		int32_t result = pipelines[pipelineId]->setSourceElement(sourceName);
-		if (result == (int32_t)errorState::NO_ERR)
+		errorState result = pipelines[pipelineId]->setSourceElement(sourceName);
+		if (result == errorState::NO_ERR)
 		{
 			//result = pipelines[pipelineId]->setSinkElement(sinkName);			
 		}
 		return result;
 	}
-	return (int32_t)errorState::NULLPTR_ERR;
+	return errorState::NULLPTR_ERR;
 }
 // ############################################
 // This funciton retrieve all detected deviecs as a char*
@@ -50,13 +50,13 @@ int32_t mediaLib_init(int32_t pipelineId, const char* sourceName, const char* si
 //		enum class SourceType { File, Camera, Network, Screen, Test, Custom };
 // @Para names: 
 // ############################################
-int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, deviceProperties** sourceDevices)
+errorState mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, deviceProperties** sourceDevices)
 {
 	if (sourceDevices == nullptr)
 	{
-		return (int32_t)errorState::NULLPTR_ERR;
+		return errorState::NULLPTR_ERR;
 	}
-	int32_t result = (int32_t)errorState::NO_ERR;
+	errorState result = errorState::NO_ERR;
 	if (*sourceDevices != nullptr)
 	{
 		delete[] *sourceDevices;
@@ -65,7 +65,7 @@ int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, device
 	
 	std::list<std::pair<std::string, std::string>> devicesList;
 	result = pipelines[pipelineId]->getSourceInformation(devicesList);	
-	if (result == (int32_t)errorState::NO_ERR)
+	if (result == errorState::NO_ERR)
 	{
 		numberOfDevices = devicesList.size();
 		*sourceDevices = new deviceProperties[numberOfDevices];
@@ -81,23 +81,23 @@ int32_t mediaLib_getDevices(int32_t pipelineId, int32_t& numberOfDevices, device
 
 }
 
-int32_t mediaLib_setDevice(int32_t pipelineId, int32_t deviceID, int32_t capIndex)
+errorState mediaLib_setDevice(int32_t pipelineId, int32_t deviceID, int32_t capIndex)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{
 		return pipelines[pipelineId]->setSourceCaps(deviceID, capIndex);
 	}
-	return (int32_t)errorState::NULLPTR_ERR;
+	return errorState::NULLPTR_ERR;
 
 }
 
-int32_t mediaLib_startStreaming(int32_t pipelineId)
+errorState mediaLib_startStreaming(int32_t pipelineId)
 {
 
 	return pipelines[pipelineId]->startStreaming();
 }
 
-int32_t mediaLib_stopStreaming(int32_t pipelineId)
+errorState mediaLib_stopStreaming(int32_t pipelineId)
 {
 	return pipelines[pipelineId]->stopStreaming();
 }

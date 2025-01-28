@@ -7,7 +7,7 @@ GStreamerSink::GStreamerSink()
 }
 
 
-int32_t GStreamerSink::getSinkDevices()
+errorState GStreamerSink::getSinkDevices()
 {
     // Get the registry
     GstRegistry* registry = gst_registry_get();
@@ -57,7 +57,7 @@ int32_t GStreamerSink::getSinkDevices()
 
     // Free plugin list
     gst_plugin_list_free(plugin_list);
-    return (int32_t)errorState::NO_ERR;
+    return errorState::NO_ERR;
 }
 
 void GStreamerSink::addDevicePropertie(std::string deviceName, std::string longName, GstCaps* deviceCaps)

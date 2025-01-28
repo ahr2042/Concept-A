@@ -1,5 +1,5 @@
 #pragma once
-enum errorStateGui
+enum errorStateGui : int32_t
 {
 	NO_ERR,
 	SET_COMBOBOX_ERR,

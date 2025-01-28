@@ -68,81 +68,81 @@ PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSin
 
 }
 
-int32_t PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
+errorState PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
 {
 	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
 	{
 		devicesList = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable();
 		if (devicesList.empty())
 		{
-			return (int32_t)errorState::NO_VIDEO_DEVICE_FOUND_ERR;
+			return errorState::NO_VIDEO_DEVICE_FOUND_ERR;
 		}
-		return (int32_t)errorState::NO_ERR;
+		return errorState::NO_ERR;
 	}
-	return (int32_t)errorState::NULLPTR_ERR;
+	return errorState::NULLPTR_ERR;
 }
 
-int32_t PipelineManager::setSourceElement(std::string deviceName)
+errorState PipelineManager::setSourceElement(std::string deviceName)
 {
 	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
 	{
-		if (mediaSources[pipelineManagerInfo.numberOfSources]->setSourceElement(deviceName) == (int32_t)errorState::NO_ERR)
+		if (mediaSources[pipelineManagerInfo.numberOfSources]->setSourceElement(deviceName) == errorState::NO_ERR)
 		{
 			pipelineManagerInfo.sourceName = deviceName;			
-			return (int32_t)errorState::NO_ERR;
+			return errorState::NO_ERR;
 		}
-		return (int32_t)errorState::SET_SOURCE_ELEMENT_ERR;
+		return errorState::SET_SOURCE_ELEMENT_ERR;
 	}
-	return (int32_t)errorState::NULLPTR_ERR;
+	return errorState::NULLPTR_ERR;
 }
 
 
-int32_t PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
+errorState PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
 {
 	if (mediaSources[pipelineManagerInfo.numberOfSources] == nullptr)
 	{
-		return (int32_t)errorState::NULLPTR_ERR;
+		return errorState::NULLPTR_ERR;
 	}
 	
-	if (mediaSources[pipelineManagerInfo.numberOfSources]->setCapsFilterElement(deviceID, capsIndex) != (int32_t)errorState::NO_ERR)
+	if (mediaSources[pipelineManagerInfo.numberOfSources]->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
 	{
-		return (int32_t)errorState::SET_SOURCE_CAPS_ERR;
+		return errorState::SET_SOURCE_CAPS_ERR;
 	}	
-	return (int32_t)errorState::NO_ERR;
+	return errorState::NO_ERR;
 }
 
-int32_t PipelineManager::setSinkElement(std::string deviceName)
+errorState PipelineManager::setSinkElement(std::string deviceName)
 {
 	if (mediaSinks[pipelineManagerInfo.numberOfSinks] != nullptr)
 	{
-		if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setSinkElement(deviceName) == (int32_t)errorState::NO_ERR)
+		if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setSinkElement(deviceName) == errorState::NO_ERR)
 		{
 			pipelineManagerInfo.sinkName = deviceName;
-			return (int32_t)errorState::NO_ERR;
+			return errorState::NO_ERR;
 		}
-		return (int32_t)errorState::SET_SINK_ELEMENT_ERR;
+		return errorState::SET_SINK_ELEMENT_ERR;
 	}
-	return (int32_t)errorState::NULLPTR_ERR;
+	return errorState::NULLPTR_ERR;
 }
 
-int32_t PipelineManager::setSinkCaps(int32_t deviceID, int32_t capsIndex)
+errorState PipelineManager::setSinkCaps(int32_t deviceID, int32_t capsIndex)
 {
 	if (mediaSinks[pipelineManagerInfo.numberOfSinks] == nullptr)
 	{
-		return (int32_t)errorState::NULLPTR_ERR;
+		return errorState::NULLPTR_ERR;
 	}
 
-	if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setCapsFilterElement(deviceID, capsIndex) != (int32_t)errorState::NO_ERR)
+	if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
 	{
-		return (int32_t)errorState::SET_SINK_CAPS_ERR;
+		return errorState::SET_SINK_CAPS_ERR;
 	}
-	return (int32_t)errorState::NO_ERR;
+	return errorState::NO_ERR;
 }
 
-int32_t PipelineManager::startStreaming()
+errorState PipelineManager::startStreaming()
 {
-	int32_t result = buildPipeline();
-	if (result == (int32_t)errorState::NO_ERR)
+	errorState result = buildPipeline();
+	if (result == errorState::NO_ERR)
 	{
 		pipleineThread = g_thread_new("pipleineThread", startLoop, this);
 		//GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -151,32 +151,32 @@ int32_t PipelineManager::startStreaming()
 		//	gst_object_unref(pipeline);
 		//	return (int32_t)errorState::START_STREAMING_FAILED;
 		//}
-		return (int32_t)errorState::NO_ERR;
+		return errorState::NO_ERR;
 	}
 	return result;
 }
 
-int32_t PipelineManager::stopStreaming()
+errorState PipelineManager::stopStreaming()
 {
 	g_thread_exit(pipleineThread);	
 	GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
 		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
 		gst_object_unref(pipeline);
-		return (int32_t)errorState::STOP_STREAMING_FAILED;
+		return errorState::STOP_STREAMING_FAILED;
 	}
-	return (int32_t)errorState::NO_ERR;
+	return errorState::NO_ERR;
 }
 
-int32_t PipelineManager::buildPipeline()
+errorState PipelineManager::buildPipeline()
 {
 	gst_bin_add_many(GST_BIN(pipeline), mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL);
     if (!gst_element_link_many(mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL)) {
         g_error("Failed to link elements");
         gst_object_unref(pipeline);
-        return (int32_t)errorState::BUILD_PIPELINE_FAILED;
+        return errorState::BUILD_PIPELINE_FAILED;
     }
-	return (int32_t)errorState::NO_ERR;
+	return errorState::NO_ERR;
 }
 
 gpointer PipelineManager::startLoop(gpointer data)

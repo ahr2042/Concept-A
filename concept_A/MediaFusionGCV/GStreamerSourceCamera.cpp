@@ -13,11 +13,11 @@ GStreamerSourceCamera::GStreamerSourceCamera()
     getSourceDevices();       
 }
 
-int32_t GStreamerSourceCamera::getSourceDevices()
+errorState GStreamerSourceCamera::getSourceDevices()
 {
     GstDeviceMonitor* device_monitor = gst_device_monitor_new();
     if (!device_monitor) {
-        return CREATE_DEVICE_MONITOR_ERR;
+        return errorState::CREATE_DEVICE_MONITOR_ERR;
     }
 
     // Add a filter for video sources
@@ -28,7 +28,7 @@ int32_t GStreamerSourceCamera::getSourceDevices()
     // Start the device monitor
     if (!gst_device_monitor_start(device_monitor)) {
         g_object_unref(device_monitor);
-        return START_DEVICE_MONITOR_ERR;
+        return errorState::START_DEVICE_MONITOR_ERR;
     }
 
     // Get a list of devices
@@ -48,13 +48,13 @@ int32_t GStreamerSourceCamera::getSourceDevices()
         g_list_free(devices); // Free the list itself
     }
     else {
-        return NO_VIDEO_DEVICE_FOUND_ERR;
+        return errorState::NO_VIDEO_DEVICE_FOUND_ERR;
     }
 
     // Stop and clean up
     gst_device_monitor_stop(device_monitor);
     g_object_unref(device_monitor);
-    return (int32_t)errorState::NO_ERR;
+    return errorState::NO_ERR;
 }
 
 
@@ -137,14 +137,14 @@ std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceI
 
 
 
-int32_t GStreamerSourceCamera::setSourceElement(std::string deviceName)
+errorState GStreamerSourceCamera::setSourceElement(std::string deviceName)
 {
     if (sourceElement != nullptr && !deviceName.empty())
     {
         g_object_set(sourceElement, "device-name", deviceName.c_str(), NULL);
-        return (int32_t)errorState::NO_ERR;
+        return errorState::NO_ERR;
     }
-    return (int32_t)errorState::NULLPTR_ERR;
+    return errorState::NULLPTR_ERR;
 }
 
 //int32_t GStreamerSourceCamera::setConvertElement(std::string deviceName)
@@ -158,23 +158,23 @@ int32_t GStreamerSourceCamera::setSourceElement(std::string deviceName)
 //}
 
 
-int32_t GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t capIndex)
+errorState GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t capIndex)
 {
     if (capsFilter != nullptr)
     {
         std::string caps = getCapsStringAtIndex(deviceId, capIndex);
         if (caps.empty())
         {
-            return (int32_t)errorState::EMPTY_STRING_ERR;
+            return errorState::EMPTY_STRING_ERR;
         }
         GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
         if (!capsPtr)
         {
-            return (int32_t)errorState::OBJECT_CREATION_ERR;
+            return errorState::OBJECT_CREATION_ERR;
         }
         g_object_set(capsFilter, "caps", capsPtr, NULL);
         gst_caps_unref(capsPtr);
-        return (int32_t)errorState::NO_ERR;
+        return errorState::NO_ERR;
     }
-    return (int32_t)errorState::NULLPTR_ERR;
+    return errorState::NULLPTR_ERR;
 }

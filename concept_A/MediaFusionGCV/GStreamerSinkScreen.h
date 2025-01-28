@@ -8,6 +8,6 @@ class GStreamerSinkScreen : public GStreamerSink
 public:
 	GStreamerSinkScreen(ScreenSinks);
 private:
-	int32_t setSinkElement(std::string);
+	errorState setSinkElement(std::string);
 
 };
