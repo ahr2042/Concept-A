@@ -80,8 +80,7 @@ void GStreamerSink::addDevicePropertie(std::string deviceName, std::string longN
             GstStructure* structure = gst_caps_get_structure(deviceCaps, i);
             currentDevice->formattedDeviceCapabilities << "  - Format: " << gst_structure_get_name(structure) << std::endl;
 
-            // Print fields within the structure
-            const GQuark* field_names;
+            // Print fields within the structure            
             gint n_fields = gst_structure_n_fields(structure);
             for (int j = 0; j < n_fields; ++j) {
                 const gchar* field_name = gst_structure_nth_field_name(structure, j);

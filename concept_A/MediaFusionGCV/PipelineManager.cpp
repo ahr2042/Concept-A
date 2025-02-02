@@ -2,7 +2,7 @@
 #include "PipelineManager.h"
 
 
-#include "GStreamerSourceCamera.h";
+#include "GStreamerSourceCamera.h"
 #include "GStreamerSinkScreen.h"
 
 
@@ -189,4 +189,5 @@ gpointer PipelineManager::startLoop(gpointer data)
 	}	
 	GMainLoop* loop = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(loop);	
+	return data;
 }
