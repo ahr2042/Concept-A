@@ -28,6 +28,12 @@ struct deviceProperties
 	std::string formattedDeviceCapabilities = "";
 };
 
+struct pipeLine
+{
+	size_t pipelineId = 0;
+	SourceType source = SourceType::NONE_SOURCE;
+	SinkType sink = SinkType::NONE_SINK;
+};
 
 
 #ifdef __cplusplus
