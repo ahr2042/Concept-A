@@ -13,6 +13,7 @@ public:
 
 public slots:
 	void handleViewRequest(GUI_ELEMENTS);
+	void handleModelRequest(deviceProperties);
 
 
 private:

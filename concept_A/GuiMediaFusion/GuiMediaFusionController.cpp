@@ -51,6 +51,12 @@ GuiMediaFusionController::~GuiMediaFusionController()
 	delete[] argv; // Free the array of pointers
 }
 
+void GuiMediaFusionController::handleModelRequest(deviceProperties receivedProperties)
+{
+	QString emitterName = QObject::sender()->objectName();
+	MF_View->setCombobox(GUI_ELEMENTS::SOURCES, receivedProperties.formattedDeviceCapabilities)
+}
+
 errorStateGui GuiMediaFusionController::connectToView()
 {
 	if (connect(MF_View, &GuiMediaFusion::viewClassRequest, this, &GuiMediaFusionController::handleViewRequest))
@@ -62,6 +68,14 @@ errorStateGui GuiMediaFusionController::connectToView()
 
 errorStateGui GuiMediaFusionController::connectToModel()
 {
+	if (connect(MF_Model, &GuiMediaFusionModel::updateSourceDeviceInfo, this, &GuiMediaFusionController::handleModelRequest))
+	{
+		return errorStateGui::MODEL_CONNECT_ERR;
+	}
+	if (connect(MF_Model, &GuiMediaFusionModel::updateSinkDeviceInfo, this, &GuiMediaFusionController::handleModelRequest))
+	{
+		return errorStateGui::MODEL_CONNECT_ERR;
+	}
 	return errorStateGui::NO_ERR;
 }
 
