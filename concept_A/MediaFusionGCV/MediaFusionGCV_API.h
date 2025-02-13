@@ -17,28 +17,39 @@
 
 #include <string>
 #include <stdint.h>
-#include "SourceType.h"
-#include "SinkType.h"
-#include "errorState.h"
-
-
-struct deviceProperties
-{
-	std::string deviceName = "";
-	std::string formattedDeviceCapabilities = "";
-};
-
-struct pipeLine
-{
-	size_t pipelineId = 0;
-	SourceType source = SourceType::NONE_SOURCE;
-	SinkType sink = SinkType::NONE_SINK;
-};
-
 
 #ifdef __cplusplus
-	extern "C" {
+extern "C" {
 #endif
+
+#include "errorState.h"
+#include "SourceType.h"
+#include "SinkType.h"
+
+
+
+	static const char* sourcesTypes[6] = {
+		"File", "Camera", "Network", "Screen", "Test", "Custom"
+	};
+
+	static const char* sinksTypes[7] = {
+		"Screen", "File", "Network", "Hardware", "Application", "Test", "Media"
+	};
+
+
+	struct deviceProperties
+	{
+		std::string deviceName = "";
+		std::string formattedDeviceCapabilities = "";
+	};
+
+	struct pipeLine
+	{
+		size_t pipelineId = 0;
+		SourceType source = SourceType::NONE_SOURCE;
+		SinkType sink = SinkType::NONE_SINK;
+	};
+
 
 
 
