@@ -2,6 +2,7 @@
 #include "MediaFusionGCV_API.h"
 #include <qobject.h>
 #include "errorStateGui.h"
+#include "guiElements.h"
 #include <vector>
 class GuiMediaFusionModel : public QObject
 {
@@ -16,8 +17,7 @@ public:
 public slots:	
 	errorStateGui updatePipelineInfo(QString);
 signals:	
-	void updateSourceDeviceInfo(deviceProperties);
-	void updateSinkDeviceInfo(deviceProperties);
+	void updateInfo(GUI_ELEMENTS, QStringList);
 
 private:
 	std::vector<pipeLine*> pipelineStash;

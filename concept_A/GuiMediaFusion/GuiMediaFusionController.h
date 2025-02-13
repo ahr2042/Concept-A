@@ -13,7 +13,7 @@ public:
 
 public slots:
 	void handleViewRequest(GUI_ELEMENTS);
-	void handleModelRequest(deviceProperties);
+	void handleModelRequest(GUI_ELEMENTS, QStringList);
 
 
 private:
@@ -22,7 +22,7 @@ private:
 
 	errorStateGui connectToView();
 	errorStateGui connectToModel();
-
+	
 	void InitialGuiConfiguration();
 
 	int argc = 0;

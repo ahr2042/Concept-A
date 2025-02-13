@@ -24,7 +24,7 @@ GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[
 	for (int i = 0; i < argc; ++i) {
 		size_t length = strlen(mainArgv[i]) + 1; 
 		argv[i] = new char[length];   
-
+		
 		if (strcpy_s(argv[i], length, mainArgv[i]) != 0) {
 			std::cerr << "Error copying argument " << i << std::endl;
 
@@ -39,7 +39,7 @@ GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[
 	connectToView();
 	connectToModel();
 	InitialGuiConfiguration();
-	MF_View->show();
+	MF_View->show();	
 }
 
 
@@ -56,7 +56,7 @@ void GuiMediaFusionController::InitialGuiConfiguration()
 	sourcesOrSkinks.reserve(sizeof(sinksTypes) / sizeof(sinksTypes[0]));
 	for (const auto& value : sinksTypes) {
 		sourcesOrSkinks.append(value);
-}
+	}
 	MF_View->setCombobox(GUI_ELEMENTS::SINKS, sourcesOrSkinks);
 }
 
@@ -69,10 +69,9 @@ GuiMediaFusionController::~GuiMediaFusionController()
 	delete[] argv; // Free the array of pointers
 }
 
-void GuiMediaFusionController::handleModelRequest(deviceProperties receivedProperties)
-{
-	QString emitterName = QObject::sender()->objectName();
-	MF_View->setCombobox(GUI_ELEMENTS::SOURCES, receivedProperties.formattedDeviceCapabilities)
+void GuiMediaFusionController::handleModelRequest(GUI_ELEMENTS targetElement, QStringList value)
+{	
+	MF_View->setCombobox(targetElement, value);
 }
 
 errorStateGui GuiMediaFusionController::connectToView()
@@ -86,11 +85,7 @@ errorStateGui GuiMediaFusionController::connectToView()
 
 errorStateGui GuiMediaFusionController::connectToModel()
 {
-	if (connect(MF_Model, &GuiMediaFusionModel::updateSourceDeviceInfo, this, &GuiMediaFusionController::handleModelRequest))
-	{
-		return errorStateGui::MODEL_CONNECT_ERR;
-	}
-	if (connect(MF_Model, &GuiMediaFusionModel::updateSinkDeviceInfo, this, &GuiMediaFusionController::handleModelRequest))
+	if (connect(MF_Model, &GuiMediaFusionModel::updateInfo, this, &GuiMediaFusionController::handleModelRequest))
 	{
 		return errorStateGui::MODEL_CONNECT_ERR;
 	}

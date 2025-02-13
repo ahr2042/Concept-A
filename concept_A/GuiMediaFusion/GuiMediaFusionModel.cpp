@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "GuiMediaFusionModel.h"
 
+#include <iostream>
+
 GuiMediaFusionModel::GuiMediaFusionModel()
 {
 }
@@ -23,8 +25,8 @@ size_t GuiMediaFusionModel::createPipeline()
 	pipelineStash.push_back(new pipeLine);
 
 	size_t stashSize = pipelineStash.size();
-	size_t piplineID = mediaLib_create();
-	pipelineStash[stashSize]->pipelineId = piplineID;
+	//size_t piplineID = mediaLib_create();
+	//pipelineStash[stashSize]->pipelineId = piplineID;
 
 	
 	return size_t();
@@ -39,9 +41,9 @@ errorStateGui GuiMediaFusionModel::getAvailableDevices(size_t piplineID)
 		if (devices != nullptr)
 		{
 			for (int i = 0; i < devicesCount; i++)
-			{ create the the correct format to send it in a signal to the view class via control class
+			{ 
 				std::cout << "Device number " << i + 1 << ":" << std::endl;
-				std::cout << foundDevices[i].deviceName << std::endl << foundDevices[i].formattedDeviceCapabilities << std::endl;
+				//std::cout << foundDevices[i].deviceName << std::endl << foundDevices[i].formattedDeviceCapabilities << std::endl;
 			}
 		}
 	}
