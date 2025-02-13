@@ -32,6 +32,6 @@ int main(int argc, char *argv[])
     //
     //return 0;
     QApplication a(argc, argv);
-    GuiMediaFusionController MF_Controller;        
+    GuiMediaFusionController MF_Controller(argc, argv);
     return a.exec();
 }
