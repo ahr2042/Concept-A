@@ -26,6 +26,7 @@ public:
     //// Public method to get the configured GStreamer source element
     //GstElement* getSourceElement();
 
+
     struct deviceProperties
     {
         std::string deviceName = "";     
@@ -33,7 +34,7 @@ public:
         std::stringstream formattedDeviceCapabilities;
     };
     std::vector<deviceProperties*> devicesContainer;
-    virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
+    virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable() { return std::list<std::pair<std::string, std::string>>(); };
 
     virtual errorState getSourceDevices() { return errorState::NO_ERR; };
     virtual errorState setSourceElement(std::string) { return errorState::NO_ERR; };

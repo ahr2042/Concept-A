@@ -16,10 +16,7 @@
 //    return sourceElement;
 //}
 
-std::list<std::pair<std::string, std::string>> GStreamerSource::getDeviceInfoReadable()
-{
-	return std::list<std::pair<std::string, std::string>>();
-}
+
 
 std::string GStreamerSource::getCapsStringAtIndex(int32_t deviceID, guint index)
 {
