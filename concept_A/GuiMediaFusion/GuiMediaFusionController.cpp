@@ -13,20 +13,21 @@ GuiMediaFusionController::GuiMediaFusionController()
 	MF_View->show();
 }
 
+
+
+
 GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[])
 {
 	argc = mainArgc;	
 	argv = new char* [argc];
 	// Copy each argument
 	for (int i = 0; i < argc; ++i) {
-		size_t length = strlen(mainArgv[i]) + 1; // Include space for the null terminator
-		argv[i] = new char[length];   // Allocate memory for each string
+		size_t length = strlen(mainArgv[i]) + 1; 
+		argv[i] = new char[length];   
 
-		// Use strcpy_s to copy the string safely
 		if (strcpy_s(argv[i], length, mainArgv[i]) != 0) {
 			std::cerr << "Error copying argument " << i << std::endl;
 
-			// Free memory allocated so far if an error occurs
 			for (int j = 0; j <= i; ++j) {
 				delete[] argv[j];
 			}
@@ -37,9 +38,26 @@ GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[
 	MF_Model = new GuiMediaFusionModel();
 	connectToView();
 	connectToModel();
+	InitialGuiConfiguration();
 	MF_View->show();
+}
 
 
+void GuiMediaFusionController::InitialGuiConfiguration()
+{
+	QStringList sourcesOrSkinks;
+	sourcesOrSkinks.reserve(sizeof(sourcesTypes) / sizeof(sourcesTypes[0]));
+	for (const auto& value : sourcesTypes) {
+		sourcesOrSkinks.append(value);
+	}
+	MF_View->setCombobox(GUI_ELEMENTS::SOURCES, sourcesOrSkinks);
+
+	sourcesOrSkinks.clear();
+	sourcesOrSkinks.reserve(sizeof(sinksTypes) / sizeof(sinksTypes[0]));
+	for (const auto& value : sinksTypes) {
+		sourcesOrSkinks.append(value);
+}
+	MF_View->setCombobox(GUI_ELEMENTS::SINKS, sourcesOrSkinks);
 }
 
 GuiMediaFusionController::~GuiMediaFusionController()
