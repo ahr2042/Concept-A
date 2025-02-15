@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>GuiMediaFusionClass</class>
- <widget class="QMainWindow" name="GuiMediaFusionClass">
+ <class>PreLaunchSettingsClass</class>
+ <widget class="QMainWindow" name="PreLaunchSettingsClass">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>GuiMediaFusion</string>
+   <string>Pre-launch settings</string>
   </property>
   <property name="styleSheet">
    <string notr="true"/>
@@ -159,7 +159,7 @@
   <connection>
    <sender>sourcesCombobox</sender>
    <signal>currentIndexChanged(int)</signal>
-   <receiver>GuiMediaFusionClass</receiver>
+   <receiver>PreLaunchSettingsClass</receiver>
    <slot>handleUserInput()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -175,7 +175,7 @@
   <connection>
    <sender>sinksComboBox</sender>
    <signal>currentIndexChanged(int)</signal>
-   <receiver>GuiMediaFusionClass</receiver>
+   <receiver>PreLaunchSettingsClass</receiver>
    <slot>handleUserInput()</slot>
    <hints>
     <hint type="sourcelabel">

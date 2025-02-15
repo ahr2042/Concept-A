@@ -25,7 +25,7 @@ signals:
     
 
 private:
-    Ui::GuiMediaFusionClass ui;
+    Ui::PreLaunchSettingsClass ui;
     QString darkModeStyleSheet;
     QString lightModeStyleSheet;
 };

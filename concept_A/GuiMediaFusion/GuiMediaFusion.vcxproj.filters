@@ -26,7 +26,7 @@
     <QtRcc Include="GuiMediaFusion.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
-    <QtUic Include="GuiMediaFusion.ui">
+    <QtUic Include="PreLaunchSettings.ui">
       <Filter>Form Files</Filter>
     </QtUic>
     <QtMoc Include="GuiMediaFusion.h">
