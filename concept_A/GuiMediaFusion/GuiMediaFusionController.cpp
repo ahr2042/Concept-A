@@ -10,7 +10,7 @@ GuiMediaFusionController::GuiMediaFusionController()
 	MF_Model = new GuiMediaFusionModel();
 	connectToView();
 	connectToModel();
-	MF_View->show();
+	MF_View->show();	
 }
 
 
@@ -39,7 +39,7 @@ GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[
 	connectToView();
 	connectToModel();
 	InitialGuiConfiguration();
-	MF_View->show();	
+	MF_View->show();		
 }
 
 

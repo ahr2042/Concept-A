@@ -15,6 +15,7 @@ public:
     
     errorStateGui setCombobox(GUI_ELEMENTS, QStringList);
     errorStateGui getCombobox(GUI_ELEMENTS, int&);
+    void updateLog(QString);
 
 public slots:
     void handleUserInput();

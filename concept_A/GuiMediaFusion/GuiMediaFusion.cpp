@@ -22,7 +22,7 @@ GuiMediaFusion::GuiMediaFusion(QWidget *parent)
     if (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark)
     {
         this->setStyleSheet(darkModeStyleSheet);
-}
+    }
     else
     {
         this->setStyleSheet(lightModeStyleSheet);
@@ -42,13 +42,13 @@ errorStateGui GuiMediaFusion::setCombobox(GUI_ELEMENTS comboboxName, QStringList
         selectedCombobox = ui.sourcesCombobox;
         break;
     case SOURCE_CAPS:
-        selectedCombobox = ui.sourceCapsComboBox;
+        //selectedCombobox = ui.sourceCapsComboBox;
         break;
     case SINKS:
         selectedCombobox = ui.sinksComboBox;
         break;
     case SINK_CAPS:
-        selectedCombobox = ui.sinkCapsComboBox;
+        //selectedCombobox = ui.sinkCapsComboBox;
         break;
     default:        
         break;
@@ -74,19 +74,28 @@ errorStateGui GuiMediaFusion::getCombobox(GUI_ELEMENTS comboboxName, int& select
         selectedIndex = ui.sourcesCombobox->currentIndex();
         break;
     case SOURCE_CAPS:
-        selectedIndex = ui.sourceCapsComboBox->currentIndex();
+        //selectedIndex = ui.sourceCapsComboBox->currentIndex();
         break;
     case SINKS:
         selectedIndex = ui.sinksComboBox->currentIndex();
         break;
     case SINK_CAPS:
-        selectedIndex = ui.sinkCapsComboBox->currentIndex();
+        //selectedIndex = ui.sinkCapsComboBox->currentIndex();
         break;
     default:
         return errorStateGui::GET_COMBOBOX_ERR;
         break;
     }    
     return errorStateGui::NO_ERR;
+}
+
+void GuiMediaFusion::updateLog(QString logInput)
+{
+    logInput.trimmed();
+    if (!logInput.isEmpty())
+    {
+        //ui.log->append(logInput);
+    }        
 }
 
 
@@ -97,24 +106,24 @@ void GuiMediaFusion::handleUserInput()
     {
         emit viewClassRequest(GUI_ELEMENTS::TURN_ON);
     }
-    else if (pressedButtonName == ui.initPushButton->objectName())
-    {
-        emit viewClassRequest(GUI_ELEMENTS::INIT);
-    }
+    //else if (pressedButtonName == ui.initPushButton->objectName())
+    //{
+    //    emit viewClassRequest(GUI_ELEMENTS::INIT);
+    //}
     else if (pressedButtonName == ui.sourcesCombobox->objectName())
     {
         emit viewClassRequest(GUI_ELEMENTS::SOURCES);
     }
-    else if (pressedButtonName == ui.sourceCapsComboBox->objectName())
-    {
-        emit viewClassRequest(GUI_ELEMENTS::SOURCE_CAPS);
-    }
+    //else if (pressedButtonName == ui.sourceCapsComboBox->objectName())
+    //{
+    //    emit viewClassRequest(GUI_ELEMENTS::SOURCE_CAPS);
+    //}
     else if (pressedButtonName == ui.sinksComboBox->objectName())
     {
         emit viewClassRequest(GUI_ELEMENTS::SINKS);
     }
-    else if (pressedButtonName == ui.sinkCapsComboBox->objectName())
-    {
-        emit viewClassRequest(GUI_ELEMENTS::SINK_CAPS);
-    }
+    //else if (pressedButtonName == ui.sinkCapsComboBox->objectName())
+    //{
+    //    emit viewClassRequest(GUI_ELEMENTS::SINK_CAPS);
+    //}
 }
