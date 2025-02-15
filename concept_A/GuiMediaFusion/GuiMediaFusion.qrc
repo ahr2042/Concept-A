@@ -1,4 +1,6 @@
 <RCC>
-    <qresource prefix="GuiMediaFusion">
+    <qresource prefix="/styleSheets">
+        <file>darkMode.qss</file>
+        <file>lightMode.qss</file>
     </qresource>
 </RCC>

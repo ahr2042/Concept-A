@@ -5,6 +5,29 @@ GuiMediaFusion::GuiMediaFusion(QWidget *parent)
     : QMainWindow(parent)
 {
     ui.setupUi(this);
+    QFile file(":/styleSheets/darkMode.qss");
+    if (file.open(QFile::ReadOnly | QIODevice::Text))
+    {
+        darkModeStyleSheet = QLatin1StringView(file.readAll());
+        file.close();
+    }    
+    
+    file.setFileName(":/styleSheets/lightMode.qss");
+    if (file.open(QFile::ReadOnly | QIODevice::Text))
+    {
+        lightModeStyleSheet = QLatin1StringView(file.readAll());
+        file.close();
+    }
+
+    if (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark)
+    {
+        this->setStyleSheet(darkModeStyleSheet);
+}
+    else
+    {
+        this->setStyleSheet(lightModeStyleSheet);
+    }        
+    ui.statusBar->showMessage("Ready");
 }
 
 GuiMediaFusion::~GuiMediaFusion()
