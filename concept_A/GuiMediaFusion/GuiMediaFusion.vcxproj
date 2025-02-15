@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <QtRcc Include="GuiMediaFusion.qrc" />
+    <QtUic Include="GuiMediaFusion.ui" />
     <QtUic Include="PreLaunchSettings.ui" />
     <QtMoc Include="GuiMediaFusion.h" />
     <ClCompile Include="GuiMediaFusion.cpp" />
