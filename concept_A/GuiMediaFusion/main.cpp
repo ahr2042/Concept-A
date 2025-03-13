@@ -1,6 +1,5 @@
-#ifdef _WIN32
 #include "stdafx.h"
-#endif
+
 
 #include "GuiMediaFusionController.h"
 
