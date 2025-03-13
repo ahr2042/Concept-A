@@ -94,7 +94,7 @@ errorStateGui GuiMediaFusionController::connectToModel()
 
 
 
-void GuiMediaFusionController::handleViewRequest(GUI_ELEMENTS requesterElement)
+void GuiMediaFusionController::handleViewRequest(GUI_ELEMENTS requesterElement, QVariant optional)
 {
 	switch (requesterElement)
 	{

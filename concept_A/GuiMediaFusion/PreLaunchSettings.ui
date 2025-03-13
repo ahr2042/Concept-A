@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<ui version="4.0">
+<UI version="4.0">
  <class>PreLaunchSettingsClass</class>
  <widget class="QMainWindow" name="PreLaunchSettingsClass">
   <property name="geometry">
@@ -122,4 +121,4 @@
  <slots>
   <slot>handleUserInput()</slot>
  </slots>
-</ui>
+</UI>
