@@ -3,7 +3,6 @@
 #include <iostream>
 
 
-
 GuiMediaFusionController::GuiMediaFusionController()
 {
 	MF_View = new GuiMediaFusion();	
@@ -24,8 +23,11 @@ GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[
 	for (int i = 0; i < argc; ++i) {
 		size_t length = strlen(mainArgv[i]) + 1; 
 		argv[i] = new char[length];   
-		
+		#ifdef _WIN32
 		if (strcpy_s(argv[i], length, mainArgv[i]) != 0) {
+		#else
+		if (strcpy(argv[i], mainArgv[i]) == nullptr) {
+		#endif
 			std::cerr << "Error copying argument " << i << std::endl;
 
 			for (int j = 0; j <= i; ++j) {

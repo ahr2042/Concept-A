@@ -2,6 +2,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include "ui_GuiMediaFusion.h"
+#include "ui_PreLaunchSettings.h"
 #include "errorStateGui.h"
 #include "guiElements.h"
 
