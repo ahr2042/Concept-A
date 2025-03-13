@@ -6,7 +6,7 @@
 GuiMediaFusion::GuiMediaFusion(QWidget *parent)
     : QMainWindow(parent)
 {
-    ui.setupUi(this);
+    ui_preLaunch.setupUi(this);
     QFile file(":/styleSheets/darkMode.qss");
     if (file.open(QFile::ReadOnly | QIODevice::Text))
     {
@@ -29,7 +29,7 @@ GuiMediaFusion::GuiMediaFusion(QWidget *parent)
     {
         this->setStyleSheet(lightModeStyleSheet);
     }        
-    ui.statusBar->showMessage("Ready");
+    ui_preLaunch.statusBar->showMessage("Ready");
 }
 
 GuiMediaFusion::~GuiMediaFusion()
@@ -41,13 +41,13 @@ errorStateGui GuiMediaFusion::setCombobox(GUI_ELEMENTS comboboxName, QStringList
     switch (comboboxName)
     {
     case SOURCES:
-        selectedCombobox = ui.sourcesCombobox;
+        selectedCombobox = ui_preLaunch.sourcesCombobox;
         break;
     case SOURCE_CAPS:
         //selectedCombobox = ui.sourceCapsComboBox;
         break;
     case SINKS:
-        selectedCombobox = ui.sinksComboBox;
+        selectedCombobox = ui_preLaunch.sinksComboBox;
         break;
     case SINK_CAPS:
         //selectedCombobox = ui.sinkCapsComboBox;
@@ -73,13 +73,13 @@ errorStateGui GuiMediaFusion::getCombobox(GUI_ELEMENTS comboboxName, int& select
     switch (comboboxName)
     {
     case SOURCES:
-        selectedIndex = ui.sourcesCombobox->currentIndex();
+        selectedIndex = ui_preLaunch.sourcesCombobox->currentIndex();
         break;
     case SOURCE_CAPS:
         //selectedIndex = ui.sourceCapsComboBox->currentIndex();
         break;
     case SINKS:
-        selectedIndex = ui.sinksComboBox->currentIndex();
+        selectedIndex = ui_preLaunch.sinksComboBox->currentIndex();
         break;
     case SINK_CAPS:
         //selectedIndex = ui.sinkCapsComboBox->currentIndex();
@@ -104,25 +104,25 @@ void GuiMediaFusion::updateLog(QString logInput)
 void GuiMediaFusion::handleUserInput()
 {
     QString pressedButtonName = QObject::sender()->objectName();    
-    if (pressedButtonName == ui.turnOnPushButton->objectName())
+    if (pressedButtonName == ui_preLaunch.turnOnPushButton->objectName())
     {
-        emit viewClassRequest(GUI_ELEMENTS::TURN_ON);
+        emit viewClassRequest(GUI_ELEMENTS::TURN_ON, QVariant());
     }
     //else if (pressedButtonName == ui.initPushButton->objectName())
     //{
     //    emit viewClassRequest(GUI_ELEMENTS::INIT);
     //}
-    else if (pressedButtonName == ui.sourcesCombobox->objectName())
+    else if (pressedButtonName == ui_preLaunch.sourcesCombobox->objectName())
     {
-        emit viewClassRequest(GUI_ELEMENTS::SOURCES);
+        emit viewClassRequest(GUI_ELEMENTS::SOURCES, QVariant());
     }
     //else if (pressedButtonName == ui.sourceCapsComboBox->objectName())
     //{
     //    emit viewClassRequest(GUI_ELEMENTS::SOURCE_CAPS);
     //}
-    else if (pressedButtonName == ui.sinksComboBox->objectName())
+    else if (pressedButtonName == ui_preLaunch.sinksComboBox->objectName())
     {
-        emit viewClassRequest(GUI_ELEMENTS::SINKS);
+        emit viewClassRequest(GUI_ELEMENTS::SINKS, QVariant());
     }
     //else if (pressedButtonName == ui.sinkCapsComboBox->objectName())
     //{

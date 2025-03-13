@@ -22,11 +22,11 @@ public slots:
     void handleUserInput();
 
 signals:
-    void viewClassRequest(GUI_ELEMENTS);
+    void viewClassRequest(GUI_ELEMENTS, QVariant);
     
 
 private:
-    Ui::PreLaunchSettingsClass ui;
+    Ui::PreLaunchSettingsClass ui_preLaunch;
     QString darkModeStyleSheet;
     QString lightModeStyleSheet;
 };

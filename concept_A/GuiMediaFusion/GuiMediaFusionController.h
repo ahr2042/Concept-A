@@ -12,7 +12,7 @@ public:
 	~GuiMediaFusionController();
 
 public slots:
-	void handleViewRequest(GUI_ELEMENTS);
+	void handleViewRequest(GUI_ELEMENTS, QVariant);
 	void handleModelRequest(GUI_ELEMENTS, QStringList);
 
 
