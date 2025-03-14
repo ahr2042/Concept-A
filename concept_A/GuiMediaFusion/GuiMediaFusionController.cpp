@@ -1,47 +1,20 @@
 #include "stdafx.h"
 #include "GuiMediaFusionController.h"
 #include <iostream>
+#include "MediaFusionGCV_API.h"
 
 
 GuiMediaFusionController::GuiMediaFusionController()
 {
 	MF_View = new GuiMediaFusion();	
-	MF_Model = new GuiMediaFusionModel();
 	connectToView();
-	connectToModel();
+	InitialGuiConfiguration();
 	MF_View->show();	
 }
 
-
-
-
-GuiMediaFusionController::GuiMediaFusionController(int mainArgc, char* mainArgv[])
+errorStateGui GuiMediaFusionController::setGuiElement(GUI_ELEMENTS, std::variant<int, std::string>)
 {
-	argc = mainArgc;	
-	argv = new char* [argc];
-	// Copy each argument
-	for (int i = 0; i < argc; ++i) {
-		size_t length = strlen(mainArgv[i]) + 1; 
-		argv[i] = new char[length];   
-		#ifdef _WIN32
-		if (strcpy_s(argv[i], length, mainArgv[i]) != 0) {
-		#else
-		if (strcpy(argv[i], mainArgv[i]) == nullptr) {
-		#endif
-			std::cerr << "Error copying argument " << i << std::endl;
-
-			for (int j = 0; j <= i; ++j) {
-				delete[] argv[j];
-			}
-			delete[] argv;			
-		}
-	}
-	MF_View = new GuiMediaFusion();
-	MF_Model = new GuiMediaFusionModel();
-	connectToView();
-	connectToModel();
-	InitialGuiConfiguration();
-	MF_View->show();		
+	return errorStateGui::NO_ERR;
 }
 
 
@@ -62,19 +35,6 @@ void GuiMediaFusionController::InitialGuiConfiguration()
 	MF_View->setCombobox(GUI_ELEMENTS::SINKS, sourcesOrSkinks);
 }
 
-GuiMediaFusionController::~GuiMediaFusionController()
-{
-	// Free the allocated memory
-	for (int i = 0; i < argc; ++i) {
-		delete[] argv[i]; // Free each string
-}
-	delete[] argv; // Free the array of pointers
-}
-
-void GuiMediaFusionController::handleModelRequest(GUI_ELEMENTS targetElement, QStringList value)
-{	
-	MF_View->setCombobox(targetElement, value);
-}
 
 errorStateGui GuiMediaFusionController::connectToView()
 {
@@ -85,23 +45,12 @@ errorStateGui GuiMediaFusionController::connectToView()
 	return errorStateGui::NO_ERR;
 }
 
-errorStateGui GuiMediaFusionController::connectToModel()
-{
-	if (connect(MF_Model, &GuiMediaFusionModel::updateInfo, this, &GuiMediaFusionController::handleModelRequest))
-	{
-		return errorStateGui::MODEL_CONNECT_ERR;
-	}
-	return errorStateGui::NO_ERR;
-}
-
-
 
 void GuiMediaFusionController::handleViewRequest(GUI_ELEMENTS requesterElement, QVariant optional)
 {
 	switch (requesterElement)
 	{
 	case TURN_ON:
-		MF_Model->initGstreamer(argc, argv);
 		break;
 	case INIT:
 		break;

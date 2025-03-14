@@ -1,35 +1,33 @@
 #include "stdafx.h"
 #include "GuiMediaFusionModel.h"
-
+#include "GuiMediaFusionController.h"
 #include <iostream>
 
-GuiMediaFusionModel::GuiMediaFusionModel()
+GuiMediaFusionModel::GuiMediaFusionModel(int mainArgc, char** mainArgv)
 {
+	(mediaLib_GStreamerInit(mainArgc, mainArgv));
+	MF_Controller = new GuiMediaFusionController;
 }
 
 GuiMediaFusionModel::~GuiMediaFusionModel()
 {
 }
 
-errorStateGui GuiMediaFusionModel::initGstreamer(int argc, char** argv)
-{
-	if (mediaLib_GStreamerInit(argc, argv) != errorState::NO_ERR)
-	{
-
-	}
-	return errorStateGui::NO_ERR;
-}
-
-size_t GuiMediaFusionModel::createPipeline()
+size_t GuiMediaFusionModel::createPipeline(SourceType selectedSource, SinkType selectedSink, std::string pipelineName)
 {	
 	pipelineStash.push_back(new pipeLine);
 
-	size_t stashSize = pipelineStash.size();
-	//size_t piplineID = mediaLib_create();
-	//pipelineStash[stashSize]->pipelineId = piplineID;
+	size_t stashSize = pipelineStash.size() - 1;
+	size_t piplineID = mediaLib_create(selectedSource, selectedSink, pipelineName.c_str());
+	pipelineStash[stashSize]->pipelineId = piplineID;
+	pipelineStash[stashSize]->source = selectedSource;
+	pipelineStash[stashSize]->sink = selectedSink;	
+	return piplineID;
+}
 
-	
-	return size_t();
+errorState GuiMediaFusionModel::init()
+{
+	return errorState();
 }
 
 errorStateGui GuiMediaFusionModel::getAvailableDevices(size_t piplineID)
@@ -49,13 +47,19 @@ errorStateGui GuiMediaFusionModel::getAvailableDevices(size_t piplineID)
 	}
 	return errorStateGui::GET_AVAILABLE_DEVICES_ERR;
 }
-errorStateGui GuiMediaFusionModel::updatePipelineInfo(QString incomingInformation)
+errorStateGui GuiMediaFusionModel::startStream(size_t piplineID)
 {
-	incomingInformation.trimmed();
-	//if (!incomingInformation.isEmpty())
-	//{
-	//	QStringList  incomingInformation.split(";", Qt::SkipEmptyParts);
-
-	//}
-	return errorStateGui::NO_ERR;	
+	if (piplineID >= 0)
+	{
+		mediaLib_startStreaming(piplineID);
+	}
+	return errorStateGui::NO_ERR;
+}
+errorStateGui GuiMediaFusionModel::stopStream(size_t piplineID)
+{
+	if (piplineID >= 0)
+	{
+		mediaLib_stopStreaming(piplineID);
+	}
+	return errorStateGui::NO_ERR;
 }

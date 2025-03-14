@@ -5,6 +5,7 @@
 #include "ui_PreLaunchSettings.h"
 #include "errorStateGui.h"
 #include "guiElements.h"
+#include "string.h"
 
 class GuiMediaFusion : public QMainWindow
 {

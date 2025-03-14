@@ -55,13 +55,13 @@ extern "C" {
 
 	MEDIAFUSIONGCV_API errorState mediaLib_GStreamerInit(int argc, char* argv[]);
 	MEDIAFUSIONGCV_API size_t mediaLib_create(SourceType, SinkType, const char*);
-	MEDIAFUSIONGCV_API errorState mediaLib_init(int32_t, const char*, const char*);
-	MEDIAFUSIONGCV_API errorState mediaLib_getDevices(int32_t, size_t&, deviceProperties**);
-	MEDIAFUSIONGCV_API errorState mediaLib_setDevice(int32_t, int32_t, int32_t);
-	MEDIAFUSIONGCV_API errorState mediaLib_startStreaming(int32_t );
-	MEDIAFUSIONGCV_API errorState mediaLib_stopStreaming(int32_t );
+	MEDIAFUSIONGCV_API errorState mediaLib_init(size_t, const char*, const char*);
+	MEDIAFUSIONGCV_API errorState mediaLib_getDevices(size_t, size_t&, deviceProperties**);
+	MEDIAFUSIONGCV_API errorState mediaLib_setDevice(size_t, int32_t, int32_t);
+	MEDIAFUSIONGCV_API errorState mediaLib_startStreaming(size_t);
+	MEDIAFUSIONGCV_API errorState mediaLib_stopStreaming(size_t);
 
-	MEDIAFUSIONGCV_API size_t mediaLib_delete(int32_t);
+	MEDIAFUSIONGCV_API size_t mediaLib_delete(size_t);
 
 
 #ifdef __cplusplus

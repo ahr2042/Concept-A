@@ -1,27 +1,28 @@
 #pragma once
 #include "MediaFusionGCV_API.h"
-#include <qobject.h>
 #include "errorStateGui.h"
 #include "guiElements.h"
 #include <vector>
-class GuiMediaFusionModel : public QObject
-{
-	Q_OBJECT
+
+class GuiMediaFusionController;
+
+class GuiMediaFusionModel
+{	
 public:
-	GuiMediaFusionModel();
+	GuiMediaFusionModel(int, char**);
 	~GuiMediaFusionModel();
 
-	errorStateGui initGstreamer(int, char**);
-	size_t createPipeline();
+	size_t createPipeline(SourceType, SinkType, std::string);
+	errorState init();
+	errorStateGui getAvailableDevices(size_t);
+	errorStateGui startStream(size_t);
+	errorStateGui stopStream(size_t);
 
-public slots:	
-	errorStateGui updatePipelineInfo(QString);
-signals:	
-	void updateInfo(GUI_ELEMENTS, QStringList);
+
 
 private:
 	std::vector<pipeLine*> pipelineStash;
-	errorStateGui getAvailableDevices(size_t);
 	
+	GuiMediaFusionController* MF_Controller = nullptr;
 	
 };

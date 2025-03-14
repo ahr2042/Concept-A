@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "GuiMediaFusion.h"
 
-#include "string.h"
+
 
 GuiMediaFusion::GuiMediaFusion(QWidget *parent)
     : QMainWindow(parent)

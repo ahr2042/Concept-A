@@ -19,7 +19,7 @@ size_t mediaLib_create(SourceType chosenSourceType, SinkType chosenSinkType, con
 	return pipelines.size() -1;
 }
 
-size_t mediaLib_delete(int32_t pipelineId)
+size_t mediaLib_delete(size_t pipelineId)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{
@@ -31,7 +31,7 @@ size_t mediaLib_delete(int32_t pipelineId)
 }
 
 
-errorState mediaLib_init(int32_t pipelineId, const char* sourceName, const char* sinkName)
+errorState mediaLib_init(size_t pipelineId, const char* sourceName, const char* sinkName)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{		
@@ -50,7 +50,7 @@ errorState mediaLib_init(int32_t pipelineId, const char* sourceName, const char*
 //		enum class SourceType { File, Camera, Network, Screen, Test, Custom };
 // @Para names: 
 // ############################################
-errorState mediaLib_getDevices(int32_t pipelineId, size_t& numberOfDevices, deviceProperties** sourceDevices)
+errorState mediaLib_getDevices(size_t pipelineId, size_t& numberOfDevices, deviceProperties** sourceDevices)
 {
 	if (sourceDevices == nullptr)
 	{
@@ -81,7 +81,7 @@ errorState mediaLib_getDevices(int32_t pipelineId, size_t& numberOfDevices, devi
 
 }
 
-errorState mediaLib_setDevice(int32_t pipelineId, int32_t deviceID, int32_t capIndex)
+errorState mediaLib_setDevice(size_t pipelineId, int32_t deviceID, int32_t capIndex)
 {
 	if (pipelines[pipelineId] != nullptr)
 	{
@@ -91,13 +91,13 @@ errorState mediaLib_setDevice(int32_t pipelineId, int32_t deviceID, int32_t capI
 
 }
 
-errorState mediaLib_startStreaming(int32_t pipelineId)
+errorState mediaLib_startStreaming(size_t pipelineId)
 {
 
 	return pipelines[pipelineId]->startStreaming();
 }
 
-errorState mediaLib_stopStreaming(int32_t pipelineId)
+errorState mediaLib_stopStreaming(size_t pipelineId)
 {
 	return pipelines[pipelineId]->stopStreaming();
 }
