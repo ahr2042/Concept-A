@@ -1,6 +1,8 @@
-<UI version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <author>Ahmad Rashed</author>
+ <class>GuiMediaFusion_widget</class>
+ <widget class="QWidget" name="GuiMediaFusion_widget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -12,50 +14,112 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QDockWidget" name="dockWidget">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>20</y>
-     <width>261</width>
-     <height>591</height>
-    </rect>
-   </property>
-   <widget class="QWidget" name="dockWidgetContents">
-    <widget class="QWidget" name="widget" native="true">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>0</y>
-       <width>261</width>
-       <height>741</height>
-      </rect>
+  <layout class="QGridLayout" name="gridLayout_4">
+   <item row="1" column="0">
+    <widget class="QDockWidget" name="information_dockWidget">
+     <property name="maximumSize">
+      <size>
+       <width>524287</width>
+       <height>300</height>
+      </size>
      </property>
+     <property name="features">
+      <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
+     </property>
+     <property name="windowTitle">
+      <string>Infromation</string>
+     </property>
+     <widget class="QWidget" name="dockWidgetContents_2">
+      <layout class="QGridLayout" name="gridLayout_5">
+       <item row="0" column="0">
+        <widget class="QWidget" name="log_widget" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <item>
+           <widget class="QLabel" name="log_label">
+            <property name="text">
+             <string>Log</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QTextEdit" name="log_textEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QWidget" name="metaData_widget" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_2">
+          <item>
+           <widget class="QLabel" name="metaData_label">
+            <property name="text">
+             <string>Meta Data</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QTextEdit" name="metaData_textEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
-   </widget>
-  </widget>
-  <widget class="QWidget" name="widget_2" native="true">
-   <property name="geometry">
-    <rect>
-     <x>310</x>
-     <y>70</y>
-     <width>791</width>
-     <height>471</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QDockWidget" name="dockWidget_2">
-   <property name="geometry">
-    <rect>
-     <x>40</x>
-     <y>650</y>
-     <width>1081</width>
-     <height>211</height>
-    </rect>
-   </property>
-   <widget class="QWidget" name="dockWidgetContents_2"/>
-  </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QWidget" name="streams_Widget" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <layout class="QGridLayout" name="gridLayout"/>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QDockWidget" name="controls_dockWidget">
+     <property name="maximumSize">
+      <size>
+       <width>300</width>
+       <height>524287</height>
+      </size>
+     </property>
+     <property name="features">
+      <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
+     </property>
+     <property name="windowTitle">
+      <string>Controls</string>
+     </property>
+     <widget class="QWidget" name="dockWidgetContents">
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="0" column="0">
+        <widget class="QWidget" name="widget" native="true">
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="1">
+           <widget class="QPushButton" name="stopStream_pushButton">
+            <property name="text">
+             <string>Stop Stream</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QPushButton" name="startStream_pushButton">
+            <property name="text">
+             <string>Start Stream</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
-</UI>
+</ui>
