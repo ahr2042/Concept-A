@@ -30,4 +30,6 @@ private:
     Ui::PreLaunchSettingsClass ui_preLaunch;
     QString darkModeStyleSheet;
     QString lightModeStyleSheet;
+
+    QPair<QWidget*, QLabel*> streamElements;
 };
