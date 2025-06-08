@@ -1,3 +1,2 @@
 # Concept-A
-Initial project goal is to use a GUI to create a dynamic pipeline for media streaimg using GStreamer and image processing via OpenCV. 
-### This project is still in progress. 
+A simple C++ media player that uses Qt for the user interface and GStreamer for video and audio playback from cameras, designed to introduce core concepts of both frameworks.
