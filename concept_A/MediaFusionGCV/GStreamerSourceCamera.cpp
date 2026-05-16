@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GStreamerSourceCamera.h"
 
 GStreamerSourceCamera::GStreamerSourceCamera()

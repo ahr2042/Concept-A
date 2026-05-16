@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "MediaFusionGCV_API.h"
 #include "PipelineManager.h"
 

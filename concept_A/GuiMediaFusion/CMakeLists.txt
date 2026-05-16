@@ -46,10 +46,6 @@ qt_add_executable(${PROJECT_NAME}
 ${SOURCE_FILES}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-Qt6::Widgets
-${CMAKE_CURRENT_SOURCE_DIR}/../x64_debug/libMediaFusionGCV_Lib.so
-)
 
 target_include_directories(${PROJECT_NAME}
  PRIVATE

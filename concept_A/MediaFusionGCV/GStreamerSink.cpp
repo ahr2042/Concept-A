@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GStreamerSink.h"
 
 GStreamerSink::GStreamerSink()

@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GStreamerSinkScreen.h"
 
 GStreamerSinkScreen::GStreamerSinkScreen(ScreenSinks screenSink)
