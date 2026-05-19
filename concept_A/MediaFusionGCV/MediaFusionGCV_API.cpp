@@ -62,18 +62,16 @@ errorState mediaLib_getDevices(size_t pipelineId, size_t& numberOfDevices, devic
 		*sourceDevices = nullptr;
 	}
 	
-	std::list<std::pair<std::string, std::string>> devicesList;
-	result = pipelines[pipelineId]->getSourceInformation(devicesList);	
+	std::vector<std::pair<std::string, std::string>> devicesList;
+	result = pipelines[pipelineId]->getSourceInformation(devicesList);
 	if (result == errorState::NO_ERR)
 	{
 		numberOfDevices = devicesList.size();
 		*sourceDevices = new deviceProperties[numberOfDevices];
-		for (int i = 0; i < numberOfDevices; i++)
+		for (size_t i = 0; i < numberOfDevices; i++)
 		{
-			std::pair<std::string, std::string> device = devicesList.front();
-			(*sourceDevices)[i].deviceName = device.first;
-			(*sourceDevices)[i].formattedDeviceCapabilities = device.second;
-			devicesList.pop_front();
+			(*sourceDevices)[i].deviceName                    = devicesList[i].first;
+			(*sourceDevices)[i].formattedDeviceCapabilities   = devicesList[i].second;
 		}
 	}
 	return result;
