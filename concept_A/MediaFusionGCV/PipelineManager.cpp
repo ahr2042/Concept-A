@@ -37,23 +37,18 @@ PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const cha
 
 PipelineManager::~PipelineManager()
 {
-    if (mainLoop)
-        g_main_loop_quit(mainLoop);
-    if (pipelineThread) {
-        g_thread_join(pipelineThread);
-        pipelineThread = nullptr;
-    }
-    if (mainLoop) {
-        g_main_loop_unref(mainLoop);
-        mainLoop = nullptr;
-    }
+    stopStreaming();
+
+    // Delete source/sink before unreffing the pipeline so that each element's
+    // ref count drops from 2→1 here (source/sink unref) and then 1→0 when the
+    // pipeline bin is freed below — correct ordering avoids double-free.
+    delete source; source = nullptr;
+    delete sink;   sink   = nullptr;
+
     if (pipeline) {
-        gst_element_set_state(pipeline, GST_STATE_NULL);
         gst_object_unref(pipeline);
         pipeline = nullptr;
     }
-    delete source; source = nullptr;
-    delete sink;   sink   = nullptr;
 }
 
 errorState PipelineManager::getSourceInformation(std::vector<std::pair<std::string, std::string>>& devicesList)
@@ -100,28 +95,25 @@ errorState PipelineManager::startStreaming()
     errorState result = buildPipeline();
     if (result != errorState::NO_ERR) return result;
 
-    mainLoop       = g_main_loop_new(NULL, FALSE);
+    stopRequested.store(false);
     pipelineThread = g_thread_new("pipelineThread", startLoop, this);
     return errorState::NO_ERR;
 }
 
 errorState PipelineManager::stopStreaming()
 {
-    if (mainLoop)
-        g_main_loop_quit(mainLoop);
-    if (pipelineThread) {
-        g_thread_join(pipelineThread);
-        pipelineThread = nullptr;
-    }
-    if (mainLoop) {
-        g_main_loop_unref(mainLoop);
-        mainLoop = nullptr;
-    }
-    GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        std::cerr << "Failed to set pipeline to NULL state.\n";
-        return errorState::STOP_STREAMING_FAILED;
-    }
+    if (!pipelineThread) return errorState::NO_ERR;
+
+    // Signal the bus-polling loop in startLoop to exit.
+    stopRequested.store(true);
+
+    g_thread_join(pipelineThread);
+    pipelineThread = nullptr;
+
+    if (pipeline)
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+
+    stopRequested.store(false);
     return errorState::NO_ERR;
 }
 
@@ -135,6 +127,14 @@ errorState PipelineManager::buildPipeline()
         source->converter,
         sink->sinkElement,
         NULL);
+
+    // gst_bin_add sinks the floating reference of each element so the pipeline
+    // now holds the only reference.  Add an explicit ref so that source/sink
+    // destructors can safely unref their own pointers without a double-free.
+    gst_object_ref(source->sourceElement);
+    gst_object_ref(source->capsFilter);
+    gst_object_ref(source->converter);
+    gst_object_ref(sink->sinkElement);
 
     struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
     LinkStep steps[] = {
@@ -153,12 +153,32 @@ errorState PipelineManager::buildPipeline()
 
 gpointer PipelineManager::startLoop(gpointer data)
 {
-    PipelineManager* self = static_cast<PipelineManager*>(data);
+    auto* self = static_cast<PipelineManager*>(data);
+
     GstStateChangeReturn ret = gst_element_set_state(self->pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
-        std::cerr << "Failed to set pipeline to PLAYING state.\n";
+        std::cerr << "Pipeline failed to reach PLAYING state.\n";
         return data;
     }
-    g_main_loop_run(self->mainLoop);
+
+    // Poll the bus for errors/EOS, checking stopRequested every 100 ms.
+    // This avoids g_main_loop_run which is unreliable in forked child processes.
+    GstBus* bus = gst_element_get_bus(self->pipeline);
+    while (!self->stopRequested.load()) {
+        GstMessage* msg = gst_bus_timed_pop_filtered(bus,
+            100 * GST_MSECOND,
+            static_cast<GstMessageType>(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+        if (!msg) continue;
+
+        if (GST_MESSAGE_TYPE(msg) == GST_MESSAGE_ERROR) {
+            GError* err = nullptr;
+            gst_message_parse_error(msg, &err, nullptr);
+            std::cerr << "Pipeline error: " << (err ? err->message : "unknown") << "\n";
+            if (err) g_error_free(err);
+        }
+        gst_message_unref(msg);
+        break;
+    }
+    gst_object_unref(bus);
     return data;
 }

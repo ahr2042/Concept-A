@@ -13,6 +13,7 @@
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
 
+#include <atomic>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -31,12 +32,12 @@ public:
     errorState stopStreaming();
 
 private:
-    GstElement*      pipeline      = nullptr;
-    GThread*         pipelineThread = nullptr;
-    GMainLoop*       mainLoop      = nullptr;
-    GStreamerSource* source        = nullptr;
-    GStreamerSink*   sink          = nullptr;
+    GstElement*           pipeline       = nullptr;
+    GThread*              pipelineThread = nullptr;
+    GStreamerSource*       source         = nullptr;
+    GStreamerSink*         sink           = nullptr;
+    std::atomic<bool>     stopRequested  { false };
 
-    errorState buildPipeline();
+    errorState      buildPipeline();
     static gpointer startLoop(gpointer data);
 };
