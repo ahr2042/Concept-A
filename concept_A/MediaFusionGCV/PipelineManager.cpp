@@ -141,27 +141,32 @@ errorState PipelineManager::setSinkCaps(int32_t deviceID, int32_t capsIndex)
 errorState PipelineManager::startStreaming()
 {
 	errorState result = buildPipeline();
-	if (result == errorState::NO_ERR)
-	{
-		pipleineThread = g_thread_new("pipleineThread", startLoop, this);
-		//GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
-		//if (ret == GST_STATE_CHANGE_FAILURE) {
-		//	std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
-		//	gst_object_unref(pipeline);
-		//	return (int32_t)errorState::START_STREAMING_FAILED;
-		//}
-		return errorState::NO_ERR;
-	}
-	return result;
+	if (result != errorState::NO_ERR)
+		return result;
+
+	mainLoop = g_main_loop_new(NULL, FALSE);
+	pipleineThread = g_thread_new("pipleineThread", startLoop, this);
+	return errorState::NO_ERR;
 }
 
 errorState PipelineManager::stopStreaming()
 {
-	g_thread_exit(pipleineThread);	
+	if (mainLoop)
+		g_main_loop_quit(mainLoop);
+
+	if (pipleineThread) {
+		g_thread_join(pipleineThread);
+		pipleineThread = nullptr;
+	}
+
+	if (mainLoop) {
+		g_main_loop_unref(mainLoop);
+		mainLoop = nullptr;
+	}
+
 	GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
-		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
-		gst_object_unref(pipeline);
+		std::cerr << "Failed to set pipeline to NULL state." << std::endl;
 		return errorState::STOP_STREAMING_FAILED;
 	}
 	return errorState::NO_ERR;
@@ -180,13 +185,12 @@ errorState PipelineManager::buildPipeline()
 
 gpointer PipelineManager::startLoop(gpointer data)
 {
-	GstStateChangeReturn ret = gst_element_set_state(((PipelineManager*)data)->pipeline, GST_STATE_PLAYING);
+	PipelineManager* self = static_cast<PipelineManager*>(data);
+	GstStateChangeReturn ret = gst_element_set_state(self->pipeline, GST_STATE_PLAYING);
 	if (ret == GST_STATE_CHANGE_FAILURE) {
 		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
-		gst_object_unref(((PipelineManager*)data)->pipeline);
 		return data;
-	}	
-	GMainLoop* loop = g_main_loop_new(NULL, FALSE);
-	g_main_loop_run(loop);	
+	}
+	g_main_loop_run(self->mainLoop);
 	return data;
 }
