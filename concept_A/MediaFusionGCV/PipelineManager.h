@@ -12,70 +12,31 @@
 
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
-#include "PipelineConfig.h"
 
 #include <string>
-#include <sstream>
-#include <list>
-#include <memory>
-#include <stdexcept>
-#include <map>
 #include <vector>
 #include <iostream>
 
-
 class PipelineManager {
 public:
-    PipelineManager(SourceType , SinkType, const char*);
+    PipelineManager(SourceType, SinkType, const char*);
     ~PipelineManager();
 
-    errorState getSourceInformation(std::list<std::pair<std::string, std::string>>&);
-    //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
-    
-    errorState setSourceElement(std::string);
+    errorState getSourceInformation(std::vector<std::pair<std::string, std::string>>&);
+    errorState setSourceElement(const std::string&);
     errorState setSourceCaps(int32_t, int32_t);
-
-    errorState setSinkElement(std::string);
+    errorState setSinkElement(const std::string&);
     errorState setSinkCaps(int32_t, int32_t);
-
     errorState startStreaming();
     errorState stopStreaming();
 
-
-    
-
 private:
-    GstElement* pipeline = nullptr;
-    GThread* pipleineThread = nullptr;
-    GMainLoop* mainLoop = nullptr;
-    std::vector<GStreamerSource*> mediaSources;
-    std::vector<GStreamerSink*> mediaSinks;
+    GstElement*      pipeline      = nullptr;
+    GThread*         pipelineThread = nullptr;
+    GMainLoop*       mainLoop      = nullptr;
+    GStreamerSource* source        = nullptr;
+    GStreamerSink*   sink          = nullptr;
+
     errorState buildPipeline();
     static gpointer startLoop(gpointer data);
-    struct piplineInfo
-    {
-        SourceType typeOfSource = SourceType::NONE_SOURCE;
-        int32_t numberOfSources = -1;
-        std::string sourceName = "";
-        std::string sourceCap = "";
-
-        int32_t numberOfSinks = -1;
-        std::string sinkName = "";
-        std::string sinkCap = "";
-
-
-    };
-
-    struct _CustomData {
-        GstElement* source;
-        GstElement* convert;
-        GstElement* resample;
-        GstElement* sink;
-        GstElement* pipeline;
-    };
-
-    piplineInfo pipelineManagerInfo;
-
-
-
 };

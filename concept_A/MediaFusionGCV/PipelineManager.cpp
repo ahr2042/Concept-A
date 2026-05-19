@@ -1,17 +1,47 @@
 #include "PipelineManager.h"
-
-
 #include "GStreamerSourceCamera.h"
 #include "GStreamerSinkScreen.h"
 
+PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const char* pipelineName)
+{
+    pipeline = gst_pipeline_new(pipelineName);
+
+    switch (srcType) {
+    case SourceType::CAMERA_SOURCE:
+        source = new GStreamerSourceCamera();
+        break;
+    default:
+        break;
+    }
+
+    switch (snkType) {
+    case SinkType::SCREEN_SINK:
+        sink = new GStreamerSinkScreen(ScreenSinks::AUTOVIDEOSINK);
+        break;
+    default:
+        break;
+    }
+
+    if (source) {
+        source->capsFilter = gst_element_factory_make("capsfilter",   "capsfilter");
+        source->converter  = gst_element_factory_make("videoconvert", "converter");
+    }
+
+    if (!pipeline
+        || (source && (!source->sourceElement || !source->capsFilter || !source->converter))
+        || (sink   && !sink->sinkElement))
+    {
+        g_error("Failed to create pipeline elements");
+    }
+}
 
 PipelineManager::~PipelineManager()
 {
     if (mainLoop)
         g_main_loop_quit(mainLoop);
-    if (pipleineThread) {
-        g_thread_join(pipleineThread);
-        pipleineThread = nullptr;
+    if (pipelineThread) {
+        g_thread_join(pipelineThread);
+        pipelineThread = nullptr;
     }
     if (mainLoop) {
         g_main_loop_unref(mainLoop);
@@ -22,196 +52,110 @@ PipelineManager::~PipelineManager()
         gst_object_unref(pipeline);
         pipeline = nullptr;
     }
-    for (auto* src : mediaSources) delete src;
-    for (auto* snk : mediaSinks)   delete snk;
+    delete source; source = nullptr;
+    delete sink;   sink   = nullptr;
 }
 
-PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName = "pipeline")
+errorState PipelineManager::getSourceInformation(std::vector<std::pair<std::string, std::string>>& devicesList)
 {
-	pipeline = gst_pipeline_new(pipelineName);
-
-	switch (chosenSourceType)
-	{
-	case SourceType::FILE_SOURCE:
-		break;
-	case SourceType::CAMERA_SOURCE:
-		mediaSources.push_back(new GStreamerSourceCamera());
-		break;
-	case SourceType::NETWORK_SOURCE:
-		break;
-	case SourceType::SCREEN_SOURCE:
-		break;
-	case SourceType::TEST_SOURCE:
-		break;
-	case SourceType::CUSTOM_SOURCE:
-		break;
-	default:
-		break;
-	}	
-
-	pipelineManagerInfo.typeOfSource = chosenSourceType;
-	pipelineManagerInfo.numberOfSources++;
-	pipelineManagerInfo.numberOfSinks++;
-	mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter = gst_element_factory_make("capsfilter", "capsfilter");
-	mediaSources[pipelineManagerInfo.numberOfSources]->converter = gst_element_factory_make("videoconvert", "converter");	
-
-	switch (chosenSinkType)
-	{
-	case SinkType::SCREEN_SINK:
-		mediaSinks.push_back(new GStreamerSinkScreen(ScreenSinks::AUTOVIDEOSINK));
-		break;
-	case SinkType::FILE_SINK:
-		break;
-	case SinkType::NETWORK_SINK:
-		break;
-	case SinkType::HARDWARE_SINK:
-		break;
-	case SinkType::APPLICATION_SINK:
-		break;
-	case SinkType::DEBUGGING_AND_TESTING_SINK:
-		break;
-	case SinkType::MEDIA_AND_STREAMING_SINK:
-		break;
-	default:
-		break;
-	}
-
-	if (!pipeline 
-		|| !mediaSinks[pipelineManagerInfo.numberOfSinks]->sinkElement
-		|| !mediaSources[pipelineManagerInfo.numberOfSources]->capsFilter 	
-		|| !mediaSources[pipelineManagerInfo.numberOfSources]->converter
-		|| !mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement
-		) 
-	{
-		g_error("Failed to create elements");		
-	}
-
+    if (!source) return errorState::NULLPTR_ERR;
+    devicesList = source->getDeviceInfoReadable();
+    return devicesList.empty() ? errorState::NO_VIDEO_DEVICE_FOUND_ERR : errorState::NO_ERR;
 }
 
-errorState PipelineManager::getSourceInformation(std::list<std::pair<std::string, std::string>>& devicesList)
+errorState PipelineManager::setSourceElement(const std::string& name)
 {
-	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
-	{
-		devicesList = mediaSources[pipelineManagerInfo.numberOfSources]->getDeviceInfoReadable();
-		if (devicesList.empty())
-		{
-			return errorState::NO_VIDEO_DEVICE_FOUND_ERR;
-		}
-		return errorState::NO_ERR;
-	}
-	return errorState::NULLPTR_ERR;
+    if (!source) return errorState::NULLPTR_ERR;
+    if (source->setSourceElement(name) != errorState::NO_ERR)
+        return errorState::SET_SOURCE_ELEMENT_ERR;
+    return errorState::NO_ERR;
 }
-
-errorState PipelineManager::setSourceElement(std::string deviceName)
-{
-	if (mediaSources[pipelineManagerInfo.numberOfSources] != nullptr)
-	{
-		if (mediaSources[pipelineManagerInfo.numberOfSources]->setSourceElement(deviceName) == errorState::NO_ERR)
-		{
-			pipelineManagerInfo.sourceName = deviceName;			
-			return errorState::NO_ERR;
-		}
-		return errorState::SET_SOURCE_ELEMENT_ERR;
-	}
-	return errorState::NULLPTR_ERR;
-}
-
 
 errorState PipelineManager::setSourceCaps(int32_t deviceID, int32_t capsIndex)
 {
-	if (mediaSources[pipelineManagerInfo.numberOfSources] == nullptr)
-	{
-		return errorState::NULLPTR_ERR;
-	}
-	
-	if (mediaSources[pipelineManagerInfo.numberOfSources]->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
-	{
-		return errorState::SET_SOURCE_CAPS_ERR;
-	}	
-	return errorState::NO_ERR;
+    if (!source) return errorState::NULLPTR_ERR;
+    if (source->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
+        return errorState::SET_SOURCE_CAPS_ERR;
+    return errorState::NO_ERR;
 }
 
-errorState PipelineManager::setSinkElement(std::string deviceName)
+errorState PipelineManager::setSinkElement(const std::string& name)
 {
-	if (mediaSinks[pipelineManagerInfo.numberOfSinks] != nullptr)
-	{
-		if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setSinkElement(deviceName) == errorState::NO_ERR)
-		{
-			pipelineManagerInfo.sinkName = deviceName;
-			return errorState::NO_ERR;
-		}
-		return errorState::SET_SINK_ELEMENT_ERR;
-	}
-	return errorState::NULLPTR_ERR;
+    if (!sink) return errorState::NULLPTR_ERR;
+    if (sink->setSinkElement(name) != errorState::NO_ERR)
+        return errorState::SET_SINK_ELEMENT_ERR;
+    return errorState::NO_ERR;
 }
 
 errorState PipelineManager::setSinkCaps(int32_t deviceID, int32_t capsIndex)
 {
-	if (mediaSinks[pipelineManagerInfo.numberOfSinks] == nullptr)
-	{
-		return errorState::NULLPTR_ERR;
-	}
-
-	if (mediaSinks[pipelineManagerInfo.numberOfSinks]->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
-	{
-		return errorState::SET_SINK_CAPS_ERR;
-	}
-	return errorState::NO_ERR;
+    if (!sink) return errorState::NULLPTR_ERR;
+    if (sink->setCapsFilterElement(deviceID, capsIndex) != errorState::NO_ERR)
+        return errorState::SET_SINK_CAPS_ERR;
+    return errorState::NO_ERR;
 }
 
 errorState PipelineManager::startStreaming()
 {
-	errorState result = buildPipeline();
-	if (result != errorState::NO_ERR)
-		return result;
+    errorState result = buildPipeline();
+    if (result != errorState::NO_ERR) return result;
 
-	mainLoop = g_main_loop_new(NULL, FALSE);
-	pipleineThread = g_thread_new("pipleineThread", startLoop, this);
-	return errorState::NO_ERR;
+    mainLoop       = g_main_loop_new(NULL, FALSE);
+    pipelineThread = g_thread_new("pipelineThread", startLoop, this);
+    return errorState::NO_ERR;
 }
 
 errorState PipelineManager::stopStreaming()
 {
-	if (mainLoop)
-		g_main_loop_quit(mainLoop);
-
-	if (pipleineThread) {
-		g_thread_join(pipleineThread);
-		pipleineThread = nullptr;
-	}
-
-	if (mainLoop) {
-		g_main_loop_unref(mainLoop);
-		mainLoop = nullptr;
-	}
-
-	GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
-	if (ret == GST_STATE_CHANGE_FAILURE) {
-		std::cerr << "Failed to set pipeline to NULL state." << std::endl;
-		return errorState::STOP_STREAMING_FAILED;
-	}
-	return errorState::NO_ERR;
+    if (mainLoop)
+        g_main_loop_quit(mainLoop);
+    if (pipelineThread) {
+        g_thread_join(pipelineThread);
+        pipelineThread = nullptr;
+    }
+    if (mainLoop) {
+        g_main_loop_unref(mainLoop);
+        mainLoop = nullptr;
+    }
+    GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_NULL);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        std::cerr << "Failed to set pipeline to NULL state.\n";
+        return errorState::STOP_STREAMING_FAILED;
+    }
+    return errorState::NO_ERR;
 }
 
 errorState PipelineManager::buildPipeline()
 {
-	gst_bin_add_many(GST_BIN(pipeline), mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL);
-    if (!gst_element_link_many(mediaSources[pipelineManagerInfo.numberOfSources]->sourceElement, mediaSources[pipelineManagerInfo.numberOfSources]->converter, mediaSinks[pipelineManagerInfo.numberOfSources]->sinkElement, NULL)) {
-        g_error("Failed to link elements");
-        gst_object_unref(pipeline);
+    if (!source || !sink) return errorState::NULLPTR_ERR;
+
+    gst_bin_add_many(GST_BIN(pipeline),
+        source->sourceElement,
+        source->capsFilter,
+        source->converter,
+        sink->sinkElement,
+        NULL);
+
+    if (!gst_element_link_many(
+            source->sourceElement,
+            source->capsFilter,
+            source->converter,
+            sink->sinkElement,
+            NULL)) {
+        g_error("Failed to link pipeline elements");
         return errorState::BUILD_PIPELINE_FAILED;
     }
-	return errorState::NO_ERR;
+    return errorState::NO_ERR;
 }
 
 gpointer PipelineManager::startLoop(gpointer data)
 {
-	PipelineManager* self = static_cast<PipelineManager*>(data);
-	GstStateChangeReturn ret = gst_element_set_state(self->pipeline, GST_STATE_PLAYING);
-	if (ret == GST_STATE_CHANGE_FAILURE) {
-		std::cerr << "Failed to set pipeline to PLAYING state." << std::endl;
-		return data;
-	}
-	g_main_loop_run(self->mainLoop);
-	return data;
+    PipelineManager* self = static_cast<PipelineManager*>(data);
+    GstStateChangeReturn ret = gst_element_set_state(self->pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        std::cerr << "Failed to set pipeline to PLAYING state.\n";
+        return data;
+    }
+    g_main_loop_run(self->mainLoop);
+    return data;
 }
