@@ -20,7 +20,8 @@
 
 class GStreamerSink{
 public:
-    GStreamerSink();    
+    GStreamerSink();
+    virtual ~GStreamerSink();
     struct deviceProperties
     {
         std::string deviceName = "";

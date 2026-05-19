@@ -5,6 +5,18 @@ GStreamerSink::GStreamerSink()
     getSinkDevices();
 }
 
+GStreamerSink::~GStreamerSink()
+{
+    for (auto* dev : devicesContainer) {
+        if (!dev) continue;
+        if (dev->deviceCapabilities) gst_caps_unref(dev->deviceCapabilities);
+        delete dev;
+    }
+    if (sinkElement) { gst_object_unref(sinkElement); sinkElement = nullptr; }
+    if (capsFilter)  { gst_object_unref(capsFilter);  capsFilter  = nullptr; }
+    if (converter)   { gst_object_unref(converter);   converter   = nullptr; }
+}
+
 
 errorState GStreamerSink::getSinkDevices()
 {

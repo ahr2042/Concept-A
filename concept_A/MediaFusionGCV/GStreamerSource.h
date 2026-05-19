@@ -23,6 +23,7 @@
 class GStreamerSource {
 public:
     GStreamerSource() {};
+    virtual ~GStreamerSource();
     //// Public method to get the configured GStreamer source element
     //GstElement* getSourceElement();
 
