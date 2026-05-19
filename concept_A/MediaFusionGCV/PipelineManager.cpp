@@ -5,6 +5,27 @@
 #include "GStreamerSinkScreen.h"
 
 
+PipelineManager::~PipelineManager()
+{
+    if (mainLoop)
+        g_main_loop_quit(mainLoop);
+    if (pipleineThread) {
+        g_thread_join(pipleineThread);
+        pipleineThread = nullptr;
+    }
+    if (mainLoop) {
+        g_main_loop_unref(mainLoop);
+        mainLoop = nullptr;
+    }
+    if (pipeline) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+        gst_object_unref(pipeline);
+        pipeline = nullptr;
+    }
+    for (auto* src : mediaSources) delete src;
+    for (auto* snk : mediaSinks)   delete snk;
+}
+
 PipelineManager::PipelineManager(SourceType chosenSourceType, SinkType chosenSinkType, const char* pipelineName = "pipeline")
 {
 	pipeline = gst_pipeline_new(pipelineName);

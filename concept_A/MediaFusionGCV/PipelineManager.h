@@ -27,6 +27,7 @@
 class PipelineManager {
 public:
     PipelineManager(SourceType , SinkType, const char*);
+    ~PipelineManager();
 
     errorState getSourceInformation(std::list<std::pair<std::string, std::string>>&);
     //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
