@@ -1,9 +1,8 @@
 #include "GStreamerSink.h"
 
-GStreamerSink::GStreamerSink()
-{
-    getSinkDevices();
-}
+// Constructor: device enumeration is on-demand via getSinkDevices(), not called here
+// because iterating the full GStreamer plugin registry is expensive and the list is
+// only needed if the caller explicitly queries available sinks.
 
 GStreamerSink::~GStreamerSink()
 {
@@ -71,7 +70,7 @@ errorState GStreamerSink::getSinkDevices()
     return errorState::NO_ERR;
 }
 
-void GStreamerSink::addDevicePropertie(std::string deviceName, std::string longName, GstCaps* deviceCaps)
+void GStreamerSink::addDevicePropertie(const std::string& deviceName, const std::string& longName, GstCaps* deviceCaps)
 {
     if (deviceName == "Unknown Device" && (deviceCaps == nullptr || gst_caps_is_empty(deviceCaps)))
     {
