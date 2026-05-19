@@ -136,14 +136,17 @@ errorState PipelineManager::buildPipeline()
         sink->sinkElement,
         NULL);
 
-    if (!gst_element_link_many(
-            source->sourceElement,
-            source->capsFilter,
-            source->converter,
-            sink->sinkElement,
-            NULL)) {
-        g_error("Failed to link pipeline elements");
-        return errorState::BUILD_PIPELINE_FAILED;
+    struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
+    LinkStep steps[] = {
+        { source->sourceElement, source->capsFilter,  "source → capsfilter"  },
+        { source->capsFilter,    source->converter,   "capsfilter → convert" },
+        { source->converter,     sink->sinkElement,   "convert → sink"       },
+    };
+    for (auto& s : steps) {
+        if (!gst_element_link(s.from, s.to)) {
+            std::cerr << "Failed to link: " << s.desc << "\n";
+            return errorState::BUILD_PIPELINE_FAILED;
+        }
     }
     return errorState::NO_ERR;
 }
