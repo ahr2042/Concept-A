@@ -166,7 +166,9 @@ errorState GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t
     if (capsFilter == nullptr)
         return errorState::NULLPTR_ERR;
 
-    if (deviceId < 0 || static_cast<size_t>(deviceId) >= devicesContainer.size() || !devicesContainer[deviceId])
+    if (deviceId < 0 || capIndex < 0
+        || static_cast<size_t>(deviceId) >= devicesContainer.size()
+        || !devicesContainer[deviceId])
         return errorState::NULLPTR_ERR;
 
     // Configure the source element for the selected device (sets the correct /dev/videoN path etc.)
