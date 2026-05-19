@@ -138,6 +138,7 @@ int main(int argc, char* argv[])
             std::cout << "OK bye\n" << std::flush;
             break;
         }
+
         else if (cmd == "help") {
             printHelp();
         }
@@ -260,5 +261,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    mediaLib_destroyAll();
+    pipelineMetas.clear();
     return EXIT_SUCCESS;
 }

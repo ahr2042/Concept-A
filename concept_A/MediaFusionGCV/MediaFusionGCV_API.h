@@ -62,6 +62,7 @@ extern "C" {
 	MEDIAFUSIONGCV_API errorState mediaLib_stopStreaming(size_t);
 
 	MEDIAFUSIONGCV_API size_t mediaLib_delete(size_t);
+	MEDIAFUSIONGCV_API void   mediaLib_destroyAll();
 
 
 #ifdef __cplusplus

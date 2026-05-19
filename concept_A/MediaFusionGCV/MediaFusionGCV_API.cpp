@@ -90,6 +90,13 @@ errorState mediaLib_setDevice(size_t pipelineId, int32_t deviceID, int32_t capIn
 
 }
 
+void mediaLib_destroyAll()
+{
+	for (auto* p : pipelines) delete p;
+	pipelines.clear();
+	gst_deinit();
+}
+
 errorState mediaLib_startStreaming(size_t pipelineId)
 {
 
