@@ -29,9 +29,10 @@ public:
 
     struct deviceProperties
     {
-        std::string deviceName = "";     
+        std::string deviceName = "";
         GstCaps* deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
+        GstDevice* gstDevice = nullptr;
     };
     std::vector<deviceProperties*> devicesContainer;
     virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable() { return std::list<std::pair<std::string, std::string>>(); };
