@@ -46,6 +46,7 @@ public:
 private:
     GstElement* pipeline = nullptr;
     GThread* pipleineThread = nullptr;
+    GMainLoop* mainLoop = nullptr;
     std::vector<GStreamerSource*> mediaSources;
     std::vector<GStreamerSink*> mediaSinks;
     errorState buildPipeline();
