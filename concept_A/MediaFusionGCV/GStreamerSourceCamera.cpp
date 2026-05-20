@@ -66,7 +66,7 @@ static gboolean format_structure_field(GQuark field_id, const GValue* value, gpo
     gchar* value_str = value ? g_strdup_value_contents(value) : nullptr;
     if (value_str) {
         dev->formattedDeviceCapabilities
-            << "        " << g_quark_to_string(field_id) << ": " << value_str << "\n";
+            << "    " << g_quark_to_string(field_id) << ": " << value_str << "\n";
         g_free(value_str);
     }
     return TRUE;
@@ -78,20 +78,31 @@ void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
     if (deviceName == "Unknown Device" && (!deviceCaps || gst_caps_is_empty(deviceCaps)))
         return;
 
+    GstCaps* rawCaps = gst_caps_new_empty();
+    guint total = deviceCaps ? gst_caps_get_size(deviceCaps) : 0;
+    for (guint i = 0; i < total; ++i) {
+        const GstStructure* s = gst_caps_get_structure(deviceCaps, i);
+        if (s && g_strcmp0(gst_structure_get_name(s), "video/x-raw") == 0)
+            gst_caps_append_structure(rawCaps, gst_structure_copy(s));
+    }
+    if (gst_caps_is_empty(rawCaps)) {
+        gst_caps_unref(rawCaps);
+        return;
+    }
+
     deviceProperties* dev = new deviceProperties;
-    dev->deviceName  = deviceName;
-    dev->gstDevice   = device ? GST_DEVICE(g_object_ref(device)) : nullptr;
-    dev->deviceCapabilities = gst_caps_copy(deviceCaps);
+    dev->deviceName         = deviceName;
+    dev->gstDevice          = device ? GST_DEVICE(g_object_ref(device)) : nullptr;
+    dev->deviceCapabilities = rawCaps;
 
     guint n = gst_caps_get_size(dev->deviceCapabilities);
     for (guint i = 0; i < n; ++i) {
         const GstStructure* structure = gst_caps_get_structure(dev->deviceCapabilities, i);
         if (!structure) continue;
-        if (i > 0) dev->formattedDeviceCapabilities << ";";
+        if (i > 0) dev->formattedDeviceCapabilities << "\n";
         const gchar* mediaType = gst_structure_get_name(structure);
         dev->formattedDeviceCapabilities
-            << "    Capability " << i + 1 << ":\n"
-            << "      Media Type: " << (mediaType ? mediaType : "Unknown") << "\n";
+            << "  Cap [" << i << "]: " << (mediaType ? mediaType : "Unknown") << "\n";
         gst_structure_foreach(structure, format_structure_field, dev);
     }
 

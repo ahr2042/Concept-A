@@ -84,24 +84,25 @@ static void printHelp()
     std::cout
         << "MediaFusionGCV v2.0 -- GStreamer pipeline manager\n"
         << "\n"
-        << "Typical workflow:\n"
-        << "  create camera screen mycam       -- create a camera-to-screen pipeline (id=0)\n"
-        << "  init 0 v4l2src autovideosink     -- set GStreamer element names\n"
-        << "  devices 0                        -- list available devices and capabilities\n"
-        << "  set-device 0 0 0                 -- use device 0, capability 0\n"
-        << "  start 0                          -- begin streaming\n"
-        << "  stop 0                           -- stop streaming\n"
+        << "Camera-to-screen workflow:\n"
+        << "  1. create camera screen mycam    -- allocates pipeline, prints id (e.g. id=0)\n"
+        << "  2. devices 0                     -- lists Device [N] and Cap [M] indices\n"
+        << "  3. set-device 0 <N> <M>          -- selects the device and cap to stream\n"
+        << "  4. start 0                       -- begins streaming\n"
+        << "  5. stop 0                        -- stops streaming\n"
+        << "\n"
+        << "  The GStreamer element names (v4l2src, autovideosink) are chosen automatically\n"
+        << "  from the source/sink type you give to 'create'. You do not need 'init'.\n"
         << "\n"
         << "Commands:\n"
         << "  create <src> <snk> <name>        Create a pipeline\n"
-        << "    src (name or index): none(0) file(1) camera(2) network(3) screen(4) test(5) custom(6)\n"
-        << "    snk (name or index): none(0) screen(1) file(2) network(3) hardware(4) app(5) test(6) media(7)\n"
-        << "  init <id> <src_elem> <snk_elem>  Set GStreamer source/sink element names\n"
-        << "  devices <id>                     List available source devices\n"
-        << "  set-device <id> <dev> <cap>      Select device index and capability index\n"
+        << "    src: none(0) file(1) camera(2) network(3) screen(4) test(5) custom(6)\n"
+        << "    snk: none(0) screen(1) file(2) network(3) hardware(4) app(5) test(6) media(7)\n"
+        << "  devices <id>                     List source devices with selectable caps\n"
+        << "  set-device <id> <dev> <cap>      Select Device [dev] Cap [cap] from 'devices' output\n"
         << "  start <id>                       Start streaming\n"
         << "  stop <id>                        Stop streaming\n"
-        << "  delete <id>                      Delete pipeline (IDs above it shift down)\n"
+        << "  delete <id>                      Delete pipeline\n"
         << "  list                             Show active pipelines\n"
         << "  help                             Show this help\n"
         << "  quit                             Exit\n"
@@ -186,11 +187,15 @@ int main(int argc, char* argv[])
             deviceProperties* devs = nullptr;
             errorState err = mediaLib_getDevices(id, count, &devs);
             if (err == errorState::NO_ERR) {
-                std::cout << "OK " << count << "\n";
-                for (size_t i = 0; i < count; i++)
-                    std::cout << "  [" << i << "] " << devs[i].deviceName
-                              << "\n      " << devs[i].formattedDeviceCapabilities << "\n";
+                std::cout << "OK " << count << " device(s)\n";
+                for (size_t i = 0; i < count; i++) {
+                    std::cout << "Device [" << i << "]: " << devs[i].deviceName << "\n"
+                              << devs[i].formattedDeviceCapabilities
+                              << "  → use: set-device " << id << " " << i << " <cap>\n\n";
+                }
                 delete[] devs;
+            } else if (err == errorState::NO_VIDEO_DEVICE_FOUND_ERR) {
+                std::cout << "ERR NO_VIDEO_DEVICE_FOUND_ERR (no camera detected)\n";
             } else {
                 std::cout << "ERR " << errStr(err) << "\n";
             }
@@ -218,8 +223,14 @@ int main(int argc, char* argv[])
             errorState err = mediaLib_startStreaming(id);
             if (err == errorState::NO_ERR)
                 std::cout << "OK\n" << std::flush;
-            else
-                std::cout << "ERR " << errStr(err) << "\n" << std::flush;
+            else {
+                std::cout << "ERR " << errStr(err) << "\n";
+                if (err == errorState::BUILD_PIPELINE_FAILED)
+                    std::cout << "  hint: run 'devices " << id
+                              << "' then 'set-device " << id
+                              << " <dev> <cap>' before start\n";
+                std::cout << std::flush;
+            }
         }
         else if (cmd == "stop") {
             size_t id = 0;
