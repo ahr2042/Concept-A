@@ -23,13 +23,17 @@ PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const cha
     }
 
     if (source) {
-        source->capsFilter = gst_element_factory_make("capsfilter",   "capsfilter");
-        source->converter  = gst_element_factory_make("videoconvert", "converter");
+        source->capsFilter = gst_element_factory_make("capsfilter",   "src-capsfilter");
+        source->converter  = gst_element_factory_make("videoconvert", "src-converter");
+    }
+
+    if (sink) {
+        sink->converter = gst_element_factory_make("queue", "sink-queue");
     }
 
     if (!pipeline
         || (source && (!source->sourceElement || !source->capsFilter || !source->converter))
-        || (sink   && !sink->sinkElement))
+        || (sink   && (!sink->sinkElement || !sink->converter)))
     {
         g_error("Failed to create pipeline elements");
     }
@@ -125,6 +129,7 @@ errorState PipelineManager::buildPipeline()
         source->sourceElement,
         source->capsFilter,
         source->converter,
+        sink->converter,
         sink->sinkElement,
         NULL);
 
@@ -134,17 +139,26 @@ errorState PipelineManager::buildPipeline()
     gst_object_ref(source->sourceElement);
     gst_object_ref(source->capsFilter);
     gst_object_ref(source->converter);
+    gst_object_ref(sink->converter);
     gst_object_ref(sink->sinkElement);
 
     struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
     LinkStep steps[] = {
-        { source->sourceElement, source->capsFilter,  "source → capsfilter"  },
-        { source->capsFilter,    source->converter,   "capsfilter → convert" },
-        { source->converter,     sink->sinkElement,   "convert → sink"       },
+        { source->sourceElement, source->capsFilter, "source → src-capsfilter"        },
+        { source->capsFilter,    source->converter,  "src-capsfilter → src-converter"  },
+        { source->converter,     sink->converter,    "src-converter → sink-queue"      },
+        { sink->converter,       sink->sinkElement,  "sink-queue → sink"               },
     };
     for (auto& s : steps) {
         if (!gst_element_link(s.from, s.to)) {
             std::cerr << "Failed to link: " << s.desc << "\n";
+            GstCaps* setCaps = nullptr;
+            g_object_get(source->capsFilter, "caps", &setCaps, NULL);
+            gchar* capsStr = setCaps ? gst_caps_to_string(setCaps) : nullptr;
+            std::cerr << "  capsfilter caps: "
+                      << (capsStr ? capsStr : "(not set — ANY)") << "\n";
+            g_free(capsStr);
+            if (setCaps) gst_caps_unref(setCaps);
             return errorState::BUILD_PIPELINE_FAILED;
         }
     }
