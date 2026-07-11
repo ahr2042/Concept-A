@@ -8,6 +8,12 @@
 #include <algorithm>
 #include <unistd.h>
 
+// For --serve (Unix-domain control socket) mode.
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <cstring>
+#include <cerrno>
+
 struct PipelineMeta {
     std::string name;
     SourceType  src;
@@ -79,20 +85,19 @@ static bool parseSinkType(const std::string& token, SinkType& out)
     return false;
 }
 
-static void printHelp()
+static std::string helpText()
 {
-    std::cout
-        << "MediaFusionGCV v2.0 -- GStreamer pipeline manager\n"
+    std::ostringstream o;
+    o   << "MediaFusionGCV v2.0 -- GStreamer pipeline manager\n"
         << "\n"
-        << "Camera-to-screen workflow:\n"
-        << "  1. create camera screen mycam    -- allocates pipeline, prints id (e.g. id=0)\n"
-        << "  2. devices 0                     -- lists Device [N] and Cap [M] indices\n"
-        << "  3. set-device 0 <N> <M>          -- selects the device and cap to stream\n"
-        << "  4. start 0                       -- begins streaming\n"
-        << "  5. stop 0                        -- stops streaming\n"
-        << "\n"
-        << "  The GStreamer element names (v4l2src, autovideosink) are chosen automatically\n"
-        << "  from the source/sink type you give to 'create'. You do not need 'init'.\n"
+        << "Camera-to-GUI workflow (two processes):\n"
+        << "  1. create camera app mycam       -- allocates pipeline, prints id (e.g. id=0)\n"
+        << "  2. devices 0                      -- lists Device [N] and Cap [M] indices\n"
+        << "  3. set-device 0 <N> <M>           -- selects the device and cap to stream\n"
+        << "  4. algos 0 grayscale,canny        -- (optional) real-time OpenCV chain\n"
+        << "  5. start 0                        -- begins streaming; prints the video socket\n"
+        << "                                       path the GUI connects unixfdsrc to\n"
+        << "  6. stop 0                         -- stops streaming\n"
         << "\n"
         << "Commands:\n"
         << "  create <src> <snk> <name>        Create a pipeline\n"
@@ -100,25 +105,185 @@ static void printHelp()
         << "    snk: none(0) screen(1) file(2) network(3) hardware(4) app(5) test(6) media(7)\n"
         << "  devices <id>                     List source devices with selectable caps\n"
         << "  set-device <id> <dev> <cap>      Select Device [dev] Cap [cap] from 'devices' output\n"
-        << "  start <id>                       Start streaming\n"
+        << "  algos <id> <csv>                 Set OpenCV algorithm chain (empty csv disables)\n"
+        << "  algos-list                       List available algorithm names\n"
+        << "  start <id>                       Start streaming (app sink -> prints socket path)\n"
         << "  stop <id>                        Stop streaming\n"
         << "  delete <id>                      Delete pipeline\n"
         << "  list                             Show active pipelines\n"
         << "  help                             Show this help\n"
-        << "  quit                             Exit\n"
+        << "  quit                             Close this connection (daemon keeps running)\n"
         << "\n"
-        << "Response format: OK [data] | ERR <CODE>\n"
-        << std::flush;
+        << "Response format: OK [data] | ERR <CODE>\n";
+    return o.str();
 }
 
-int main(int argc, char* argv[])
+// Handle one command line; return the full response text (identical in CLI and
+// daemon modes). 'quit'/'shutdown' are acted on by the caller, not here.
+static std::string handleCommand(const std::string& line)
 {
-    errorState gstErr = mediaLib_GStreamerInit(argc, argv);
-    if (gstErr != errorState::NO_ERR) {
-        std::cerr << "ERR " << errStr(gstErr) << " GStreamer init failed\n" << std::flush;
-        return 1;
-    }
+    std::ostringstream out;
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+    cmd = toLower(cmd);
 
+    if (cmd.empty()) {
+        // nothing
+    }
+    else if (cmd == "quit" || cmd == "exit") {
+        out << "OK bye\n";
+    }
+    else if (cmd == "shutdown") {
+        out << "OK shutting down\n";
+    }
+    else if (cmd == "help") {
+        out << helpText();
+    }
+    else if (cmd == "create") {
+        std::string srcToken, snkToken, name;
+        if (!(iss >> srcToken >> snkToken >> name)) {
+            out << "ERR INVALID_ARGS create <src> <snk> <name>\n";
+        } else {
+            SourceType src; SinkType snk;
+            if (!parseSourceType(srcToken, src))
+                out << "ERR INVALID_ARGS unknown source '" << srcToken
+                    << "' -- use: none file camera network screen test custom\n";
+            else if (!parseSinkType(snkToken, snk))
+                out << "ERR INVALID_ARGS unknown sink '" << snkToken
+                    << "' -- use: none screen file network hardware app test media\n";
+            else {
+                size_t id = mediaLib_create(src, snk, name.c_str());
+                pipelineMetas.push_back({name, src, snk});
+                out << "OK id=" << id << "\n";
+            }
+        }
+    }
+    else if (cmd == "init") {
+        size_t id = 0;
+        std::string srcElem, snkElem;
+        if (!(iss >> id >> srcElem >> snkElem))
+            out << "ERR INVALID_ARGS init <id> <src_elem> <snk_elem>\n";
+        else {
+            errorState err = mediaLib_init(id, srcElem.c_str(), snkElem.c_str());
+            out << (err == errorState::NO_ERR ? "OK\n" : ("ERR " + errStr(err) + "\n"));
+        }
+    }
+    else if (cmd == "devices") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS devices <id>\n";
+        else {
+            size_t count = 0;
+            deviceProperties* devs = nullptr;
+            errorState err = mediaLib_getDevices(id, count, &devs);
+            if (err == errorState::NO_ERR) {
+                out << "OK " << count << " device(s)\n";
+                for (size_t i = 0; i < count; i++)
+                    out << "Device [" << i << "]: " << devs[i].deviceName << "\n"
+                        << devs[i].formattedDeviceCapabilities
+                        << "  -> use: set-device " << id << " " << i << " <cap>\n\n";
+                delete[] devs;
+            } else if (err == errorState::NO_VIDEO_DEVICE_FOUND_ERR) {
+                out << "ERR NO_VIDEO_DEVICE_FOUND_ERR (no camera detected)\n";
+            } else {
+                out << "ERR " << errStr(err) << "\n";
+            }
+        }
+    }
+    else if (cmd == "set-device") {
+        size_t id = 0;
+        int32_t devId = 0, capIdx = 0;
+        if (!(iss >> id >> devId >> capIdx))
+            out << "ERR INVALID_ARGS set-device <id> <device_id> <cap_index>\n";
+        else {
+            errorState err = mediaLib_setDevice(id, devId, capIdx);
+            out << (err == errorState::NO_ERR ? "OK\n" : ("ERR " + errStr(err) + "\n"));
+        }
+    }
+    else if (cmd == "algos") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS algos <id> <csv>  (empty csv disables)\n";
+        else {
+            std::string csv;
+            std::getline(iss, csv);                       // rest of line (may be empty)
+            size_t a = csv.find_first_not_of(" \t");
+            csv = (a == std::string::npos) ? "" : csv.substr(a);
+            errorState err = mediaLib_setAlgorithms(id, csv.c_str());
+            out << (err == errorState::NO_ERR ? "OK\n" : ("ERR " + errStr(err) + "\n"));
+        }
+    }
+    else if (cmd == "algos-list") {
+        out << "OK " << mediaLib_availableAlgorithms() << "\n";
+    }
+    else if (cmd == "start") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS start <id>\n";
+        else {
+            errorState err = mediaLib_startStreaming(id);
+            if (err == errorState::NO_ERR) {
+                const char* ep = mediaLib_getStreamEndpoint(id);
+                if (ep && ep[0]) out << "OK " << ep << "\n";   // app sink: video socket path
+                else             out << "OK\n";
+            } else {
+                out << "ERR " << errStr(err) << "\n";
+                if (err == errorState::BUILD_PIPELINE_FAILED)
+                    out << "  hint: run 'devices " << id << "' then 'set-device " << id
+                        << " <dev> <cap>' before start\n";
+            }
+        }
+    }
+    else if (cmd == "stop") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS stop <id>\n";
+        else {
+            errorState err = mediaLib_stopStreaming(id);
+            out << (err == errorState::NO_ERR ? "OK\n" : ("ERR " + errStr(err) + "\n"));
+        }
+    }
+    else if (cmd == "delete") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS delete <id>\n";
+        else if (id >= pipelineMetas.size())
+            out << "ERR INVALID_ARGS no pipeline with id " << id << "\n";
+        else {
+            pipelineMetas.erase(pipelineMetas.begin() + static_cast<std::ptrdiff_t>(id));
+            size_t remaining = mediaLib_delete(id);
+            out << "OK remaining=" << remaining << "\n";
+        }
+    }
+    else if (cmd == "list") {
+        out << "OK " << pipelineMetas.size() << "\n";
+        for (size_t i = 0; i < pipelineMetas.size(); i++) {
+            int srcIdx = static_cast<int>(pipelineMetas[i].src);
+            int snkIdx = static_cast<int>(pipelineMetas[i].snk);
+            const char* sn = (srcIdx >= 0 && srcIdx <= 6) ? kSourceNames[srcIdx] : "?";
+            const char* sk = (snkIdx >= 0 && snkIdx <= 7) ? kSinkNames[snkIdx] : "?";
+            out << "  [" << i << "] " << pipelineMetas[i].name
+                << "  src=" << sn << "  snk=" << sk << "\n";
+        }
+    }
+    else {
+        out << "ERR UNKNOWN_CMD '" << cmd << "' -- type 'help' for commands\n";
+    }
+    return out.str();
+}
+
+// Returns the lowercased first token of a line (the command verb).
+static std::string commandVerb(const std::string& line)
+{
+    std::istringstream iss(line);
+    std::string c;
+    iss >> c;
+    return toLower(c);
+}
+
+static int runStdinRepl()
+{
     bool interactive = isatty(STDIN_FILENO);
     if (interactive)
         std::cout << "MediaFusionGCV ready. Type 'help' for commands.\n" << std::flush;
@@ -130,149 +295,99 @@ int main(int argc, char* argv[])
         if (!std::getline(std::cin, line)) break;
         if (line.empty()) continue;
 
-        std::istringstream iss(line);
-        std::string cmd;
-        iss >> cmd;
-        cmd = toLower(cmd);
+        std::cout << handleCommand(line) << std::flush;
+        std::string verb = commandVerb(line);
+        if (verb == "quit" || verb == "exit") break;
+    }
+    return EXIT_SUCCESS;
+}
 
-        if (cmd == "quit" || cmd == "exit") {
-            std::cout << "OK bye\n" << std::flush;
+// Serve the text protocol over a Unix-domain socket. Each request is one '\n'
+// terminated line; each response is the reply text followed by a NUL byte so the
+// client knows where a (possibly multi-line) response ends.
+static int runServer(const std::string& socketPath)
+{
+    int listenFd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (listenFd < 0) { std::perror("socket"); return 1; }
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    if (socketPath.size() >= sizeof(addr.sun_path)) {
+        std::cerr << "ERR socket path too long\n";
+        close(listenFd);
+        return 1;
+    }
+    std::strncpy(addr.sun_path, socketPath.c_str(), sizeof(addr.sun_path) - 1);
+
+    unlink(socketPath.c_str());                       // clear any stale socket
+    if (bind(listenFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        std::perror("bind"); close(listenFd); return 1;
+    }
+    if (listen(listenFd, 4) < 0) {
+        std::perror("listen"); close(listenFd); return 1;
+    }
+
+    std::cout << "MediaFusionGCV control daemon listening on " << socketPath << "\n" << std::flush;
+
+    bool running = true;
+    while (running) {
+        int clientFd = accept(listenFd, nullptr, nullptr);
+        if (clientFd < 0) {
+            if (errno == EINTR) continue;
+            std::perror("accept");
             break;
         }
 
-        else if (cmd == "help") {
-            printHelp();
-        }
-        else if (cmd == "create") {
-            std::string srcToken, snkToken, name;
-            if (!(iss >> srcToken >> snkToken >> name)) {
-                std::cout << "ERR INVALID_ARGS create <src> <snk> <name>\n" << std::flush;
-                continue;
-            }
-            SourceType src; SinkType snk;
-            if (!parseSourceType(srcToken, src)) {
-                std::cout << "ERR INVALID_ARGS unknown source '" << srcToken
-                          << "' -- use: none file camera network screen test custom\n" << std::flush;
-                continue;
-            }
-            if (!parseSinkType(snkToken, snk)) {
-                std::cout << "ERR INVALID_ARGS unknown sink '" << snkToken
-                          << "' -- use: none screen file network hardware app test media\n" << std::flush;
-                continue;
-            }
-            size_t id = mediaLib_create(src, snk, name.c_str());
-            pipelineMetas.push_back({name, src, snk});
-            std::cout << "OK id=" << id << "\n" << std::flush;
-        }
-        else if (cmd == "init") {
-            size_t id = 0;
-            std::string srcElem, snkElem;
-            if (!(iss >> id >> srcElem >> snkElem)) {
-                std::cout << "ERR INVALID_ARGS init <id> <src_elem> <snk_elem>\n" << std::flush;
-                continue;
-            }
-            errorState err = mediaLib_init(id, srcElem.c_str(), snkElem.c_str());
-            if (err == errorState::NO_ERR)
-                std::cout << "OK\n" << std::flush;
-            else
-                std::cout << "ERR " << errStr(err) << "\n" << std::flush;
-        }
-        else if (cmd == "devices") {
-            size_t id = 0;
-            if (!(iss >> id)) {
-                std::cout << "ERR INVALID_ARGS devices <id>\n" << std::flush;
-                continue;
-            }
-            size_t count = 0;
-            deviceProperties* devs = nullptr;
-            errorState err = mediaLib_getDevices(id, count, &devs);
-            if (err == errorState::NO_ERR) {
-                std::cout << "OK " << count << " device(s)\n";
-                for (size_t i = 0; i < count; i++) {
-                    std::cout << "Device [" << i << "]: " << devs[i].deviceName << "\n"
-                              << devs[i].formattedDeviceCapabilities
-                              << "  → use: set-device " << id << " " << i << " <cap>\n\n";
-                }
-                delete[] devs;
-            } else if (err == errorState::NO_VIDEO_DEVICE_FOUND_ERR) {
-                std::cout << "ERR NO_VIDEO_DEVICE_FOUND_ERR (no camera detected)\n";
-            } else {
-                std::cout << "ERR " << errStr(err) << "\n";
-            }
-            std::cout << std::flush;
-        }
-        else if (cmd == "set-device") {
-            size_t id = 0;
-            int32_t devId = 0, capIdx = 0;
-            if (!(iss >> id >> devId >> capIdx)) {
-                std::cout << "ERR INVALID_ARGS set-device <id> <device_id> <cap_index>\n" << std::flush;
-                continue;
-            }
-            errorState err = mediaLib_setDevice(id, devId, capIdx);
-            if (err == errorState::NO_ERR)
-                std::cout << "OK\n" << std::flush;
-            else
-                std::cout << "ERR " << errStr(err) << "\n" << std::flush;
-        }
-        else if (cmd == "start") {
-            size_t id = 0;
-            if (!(iss >> id)) {
-                std::cout << "ERR INVALID_ARGS start <id>\n" << std::flush;
-                continue;
-            }
-            errorState err = mediaLib_startStreaming(id);
-            if (err == errorState::NO_ERR)
-                std::cout << "OK\n" << std::flush;
-            else {
-                std::cout << "ERR " << errStr(err) << "\n";
-                if (err == errorState::BUILD_PIPELINE_FAILED)
-                    std::cout << "  hint: run 'devices " << id
-                              << "' then 'set-device " << id
-                              << " <dev> <cap>' before start\n";
-                std::cout << std::flush;
+        std::string inbuf;
+        char buf[4096];
+        bool clientOpen = true;
+        while (clientOpen) {
+            ssize_t n = read(clientFd, buf, sizeof(buf));
+            if (n <= 0) break;                        // client closed / error
+            inbuf.append(buf, static_cast<size_t>(n));
+
+            size_t nl;
+            while ((nl = inbuf.find('\n')) != std::string::npos) {
+                std::string line = inbuf.substr(0, nl);
+                inbuf.erase(0, nl + 1);
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+
+                std::string resp = handleCommand(line);
+                resp.push_back('\0');                 // frame terminator
+                if (write(clientFd, resp.data(), resp.size()) < 0) { clientOpen = false; break; }
+
+                std::string verb = commandVerb(line);
+                if (verb == "quit" || verb == "exit") { clientOpen = false; break; }
+                if (verb == "shutdown") { clientOpen = false; running = false; break; }
             }
         }
-        else if (cmd == "stop") {
-            size_t id = 0;
-            if (!(iss >> id)) {
-                std::cout << "ERR INVALID_ARGS stop <id>\n" << std::flush;
-                continue;
-            }
-            errorState err = mediaLib_stopStreaming(id);
-            if (err == errorState::NO_ERR)
-                std::cout << "OK\n" << std::flush;
-            else
-                std::cout << "ERR " << errStr(err) << "\n" << std::flush;
-        }
-        else if (cmd == "delete") {
-            size_t id = 0;
-            if (!(iss >> id)) {
-                std::cout << "ERR INVALID_ARGS delete <id>\n" << std::flush;
-                continue;
-            }
-            if (id < pipelineMetas.size())
-                pipelineMetas.erase(pipelineMetas.begin() + static_cast<std::ptrdiff_t>(id));
-            size_t remaining = mediaLib_delete(id);
-            std::cout << "OK remaining=" << remaining << "\n" << std::flush;
-        }
-        else if (cmd == "list") {
-            std::cout << "OK " << pipelineMetas.size() << "\n";
-            for (size_t i = 0; i < pipelineMetas.size(); i++) {
-                int srcIdx = static_cast<int>(pipelineMetas[i].src);
-                int snkIdx = static_cast<int>(pipelineMetas[i].snk);
-                const char* sn = (srcIdx >= 0 && srcIdx <= 6) ? kSourceNames[srcIdx] : "?";
-                const char* sk = (snkIdx >= 0 && snkIdx <= 7) ? kSinkNames[snkIdx] : "?";
-                std::cout << "  [" << i << "] " << pipelineMetas[i].name
-                          << "  src=" << sn << "  snk=" << sk << "\n";
-            }
-            std::cout << std::flush;
-        }
-        else {
-            std::cout << "ERR UNKNOWN_CMD '" << cmd << "' -- type 'help' for commands\n" << std::flush;
-        }
+        close(clientFd);
     }
+
+    close(listenFd);
+    unlink(socketPath.c_str());
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char* argv[])
+{
+    errorState gstErr = mediaLib_GStreamerInit(argc, argv);
+    if (gstErr != errorState::NO_ERR) {
+        std::cerr << "ERR " << errStr(gstErr) << " GStreamer init failed\n" << std::flush;
+        return 1;
+    }
+
+    // --serve <path> / --serve=<path> -> control-daemon mode; otherwise stdin CLI.
+    std::string serveSocket;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if ((a == "--serve" || a == "-s") && i + 1 < argc) serveSocket = argv[++i];
+        else if (a.rfind("--serve=", 0) == 0)              serveSocket = a.substr(8);
+    }
+
+    int rc = serveSocket.empty() ? runStdinRepl() : runServer(serveSocket);
 
     mediaLib_destroyAll();
     pipelineMetas.clear();
-    return EXIT_SUCCESS;
+    return rc;
 }
