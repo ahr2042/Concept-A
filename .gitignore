@@ -153,3 +153,6 @@ concept_A/MediaFusionGCV/build/CMakeFiles/MediaFusionGCV_Lib.dir/progress.make
 concept_A/MediaFusionGCV/build/cmake_install.cmake
 concept_A/MediaFusionGCV/build/CMakeCache.txt
 concept_A/MediaFusionGCV/build/Makefile
+
+/concept_A/GuiMediaFusion/build/
+/concept_A/x64_debug/
