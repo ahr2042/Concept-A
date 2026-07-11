@@ -25,6 +25,8 @@ public:
         GstCaps*      deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
         GstDevice*    gstDevice = nullptr;
+        std::string   nodePath;             // underlying kernel node (/dev/videoN)
+        bool          directV4l2 = false;   // raw v4l2 provider vs PipeWire wrapper
     };
 
     std::vector<deviceProperties*> devicesContainer;

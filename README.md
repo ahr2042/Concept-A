@@ -58,7 +58,7 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`) applied in place via a pad probe — toggled live from the console |
 | **Daemon control** | `MediaFusionGCV --serve <socket>`: full text protocol (create / devices / set-device / algos / start / stop / delete / list), one connection, serialized commands |
 | **Daemon lifecycle** | Console auto-spawns the daemon if unreachable, restarts it (`REBOOT_CORE`) or shuts it down (`TERMINATE_PID`); crash → status LED + tiles fall back to `NO_SIGNAL` |
-| **Device manager** | V4L2 enumeration with per-device caps (resolution / format / framerate) selection |
+| **Device manager** | Camera enumeration (raw V4L2 and PipeWire providers, same-node twins deduplicated) with per-device caps (resolution / format / framerate) selection; the source element is built from the selected device |
 | **Multi-stream** | 2×2 multi-grid, one independent daemon pipeline per tile |
 | **Telemetry** | Real per-stream FPS & throughput (sink pad probe); real host telemetry — AMD GPU temperature, VRAM, fan, GPU busy %, CPU package temp (hwmon, 1 Hz) |
 | **Observability** | App-wide event log with level filters and CSV export, including the full control-protocol transcript |

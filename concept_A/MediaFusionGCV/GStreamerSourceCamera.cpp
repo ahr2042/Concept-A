@@ -90,10 +90,29 @@ void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
         return;
     }
 
+    // One physical camera can be reported twice: by the raw v4l2 provider
+    // ("device.path") and again wrapped by PipeWire ("api.v4l2.path").
+    // Identify the kernel node so duplicates collapse into a single entry.
+    std::string nodePath;
+    bool directV4l2 = false;
+    if (device) {
+        if (GstStructure* props = gst_device_get_properties(device)) {
+            if (const gchar* p = gst_structure_get_string(props, "device.path")) {
+                nodePath    = p;
+                directV4l2  = true;
+            } else if (const gchar* pw = gst_structure_get_string(props, "api.v4l2.path")) {
+                nodePath = pw;
+            }
+            gst_structure_free(props);
+        }
+    }
+
     deviceProperties* dev = new deviceProperties;
     dev->deviceName         = deviceName;
     dev->gstDevice          = device ? GST_DEVICE(g_object_ref(device)) : nullptr;
     dev->deviceCapabilities = rawCaps;
+    dev->nodePath           = nodePath;
+    dev->directV4l2         = directV4l2;
 
     guint n = gst_caps_get_size(dev->deviceCapabilities);
     for (guint i = 0; i < n; ++i) {
@@ -104,6 +123,26 @@ void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
         dev->formattedDeviceCapabilities
             << "  Cap [" << i << "]: " << (mediaType ? mediaType : "Unknown") << "\n";
         gst_structure_foreach(structure, format_structure_field, dev);
+    }
+
+    if (!nodePath.empty()) {
+        for (auto& existing : devicesContainer) {
+            if (!existing || existing->nodePath != nodePath)
+                continue;
+            // Same kernel node listed twice — keep the raw v4l2 entry
+            // (direct kernel access, no session dependency).
+            if (existing->directV4l2 || !directV4l2) {
+                if (dev->gstDevice)          g_object_unref(dev->gstDevice);
+                gst_caps_unref(dev->deviceCapabilities);
+                delete dev;
+            } else {
+                if (existing->gstDevice)          g_object_unref(existing->gstDevice);
+                if (existing->deviceCapabilities) gst_caps_unref(existing->deviceCapabilities);
+                delete existing;
+                existing = dev;
+            }
+            return;
+        }
     }
 
     devicesContainer.push_back(dev);
@@ -136,8 +175,27 @@ errorState GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t
         || !devicesContainer[deviceId])
         return errorState::NULLPTR_ERR;
 
-    if (devicesContainer[deviceId]->gstDevice && sourceElement)
-        gst_device_reconfigure_element(devicesContainer[deviceId]->gstDevice, sourceElement);
+    // The enumerated device may come from a different provider than the
+    // default source element (e.g. a PipeWire node while the element is
+    // v4l2src) — reconfiguring across providers is a silent no-op. Let the
+    // device build its own matching element and swap it in; this only works
+    // while the element is not yet inside the pipeline bin.
+    if (GstDevice* gstDev = devicesContainer[deviceId]->gstDevice) {
+        if (sourceElement && !GST_OBJECT_PARENT(sourceElement)) {
+            if (GstElement* fromDev = gst_device_create_element(gstDev, "camera-source")) {
+                gst_object_unref(sourceElement);
+                sourceElement = fromDev;
+            } else if (sourceElement) {
+                gst_device_reconfigure_element(gstDev, sourceElement);
+            }
+        } else if (sourceElement) {
+            gst_device_reconfigure_element(gstDev, sourceElement);
+        }
+        if (sourceElement)
+            if (GstElementFactory* f = gst_element_get_factory(sourceElement))
+                std::cerr << "camera-source element: " << GST_OBJECT_NAME(f)
+                          << " for device '" << devicesContainer[deviceId]->deviceName << "'\n";
+    }
 
     std::string caps = getCapsStringAtIndex(deviceId, static_cast<guint>(capIndex));
     if (caps.empty())
