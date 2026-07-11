@@ -1,0 +1,73 @@
+# Build both components and run the test suites on every push or merge to main.
+#
+# Runner notes:
+#   * ubuntu-24.04 is required — the unixfd GStreamer elements (zero-copy
+#     transport) ship with GStreamer 1.24, and apt Qt is 6.4 there.
+#   * The runner has no camera and no display: the engine tests are written to
+#     accept NO_VIDEO_DEVICE_FOUND_ERR and skip device-bound assertions, and
+#     the console smoke test renders every page under the offscreen Qt
+#     platform (it spawns the engine daemon itself and drives the real
+#     control protocol).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & test (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Install toolchain and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config \
+            qt6-base-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-gl \
+            libopencv-dev
+
+      - name: Configure engine (MediaFusionGCV)
+        run: cmake -S concept_A/MediaFusionGCV -B concept_A/MediaFusionGCV/build
+
+      - name: Build engine
+        run: cmake --build concept_A/MediaFusionGCV/build -j"$(nproc)"
+
+      - name: Run engine tests (gstreamer-check)
+        run: ctest --test-dir concept_A/MediaFusionGCV/build --output-on-failure
+
+      - name: Configure console (GuiMediaFusion)
+        run: cmake -S concept_A/GuiMediaFusion -B concept_A/GuiMediaFusion/build
+
+      - name: Build console
+        run: cmake --build concept_A/GuiMediaFusion/build -j"$(nproc)"
+
+      - name: Console smoke test — offscreen render of every page
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          mkdir -p ci-pages
+          timeout 120 ./concept_A/x64_debug/GUIMediaFusion --selftest-screenshot ci-pages/page
+          ls -l ci-pages
+          test -f ci-pages/page_0_dashboard.png
+          test -f ci-pages/page_6_settings.png
+
+      - name: Upload page renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visionos-page-renders
+          path: ci-pages/*.png
+          if-no-files-found: ignore
+          retention-days: 14
