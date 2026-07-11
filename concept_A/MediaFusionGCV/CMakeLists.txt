@@ -10,15 +10,19 @@ pkg_search_module(gstreamer       REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.4)
 pkg_search_module(gstreamer-app   REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.4)
 pkg_search_module(gstreamer-video REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=1.4)
 pkg_check_modules(gstreamer-check REQUIRED IMPORTED_TARGET gstreamer-check-1.0)
+pkg_check_modules(opencv          REQUIRED IMPORTED_TARGET opencv4)
 
 # ── Shared library (everything except main.cpp) ───────────────────────────────
 set(LIB_SOURCES
     GStreamerSink.cpp
     GStreamerSinkScreen.cpp
+    GStreamerSinkApplication.cpp
     GStreamerSource.cpp
     GStreamerSourceCamera.cpp
     PipelineManager.cpp
     MediaFusionGCV_API.cpp
+    FrameProcessor.cpp
+    Algorithms.cpp
 )
 
 add_library(MediaFusionGCV_Lib STATIC ${LIB_SOURCES})
@@ -31,6 +35,7 @@ target_link_libraries(MediaFusionGCV_Lib PUBLIC
     PkgConfig::gstreamer
     PkgConfig::gstreamer-app
     PkgConfig::gstreamer-video
+    PkgConfig::opencv
 )
 
 # ── Main executable ───────────────────────────────────────────────────────────

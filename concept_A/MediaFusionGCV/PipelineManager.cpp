@@ -1,6 +1,8 @@
 #include "PipelineManager.h"
 #include "GStreamerSourceCamera.h"
 #include "GStreamerSinkScreen.h"
+#include "GStreamerSinkApplication.h"
+#include "FrameProcessor.h"
 
 PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const char* pipelineName)
 {
@@ -17,6 +19,12 @@ PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const cha
     switch (snkType) {
     case SinkType::SCREEN_SINK:
         sink = new GStreamerSinkScreen(ScreenSinks::AUTOVIDEOSINK);
+        break;
+    case SinkType::APPLICATION_SINK:
+        // IPC sink: hands frames to the GUI process over a Unix socket. The
+        // socket path can be overridden later via setSinkElement() (the sink
+        // string from mediaLib_init); default is GStreamerSinkApplication's.
+        sink = new GStreamerSinkApplication();
         break;
     default:
         break;
@@ -46,8 +54,9 @@ PipelineManager::~PipelineManager()
     // Delete source/sink before unreffing the pipeline so that each element's
     // ref count drops from 2→1 here (source/sink unref) and then 1→0 when the
     // pipeline bin is freed below — correct ordering avoids double-free.
-    delete source; source = nullptr;
-    delete sink;   sink   = nullptr;
+    delete source;    source    = nullptr;
+    delete sink;      sink      = nullptr;
+    delete processor; processor = nullptr;
 
     if (pipeline) {
         gst_object_unref(pipeline);
@@ -121,9 +130,36 @@ errorState PipelineManager::stopStreaming()
     return errorState::NO_ERR;
 }
 
+std::string PipelineManager::getStreamEndpoint() const
+{
+    return sink ? sink->endpoint() : std::string();
+}
+
+void PipelineManager::setProcessingEnabled(bool enabled)
+{
+    if (enabled && !processor)
+        processor = new FrameProcessor();
+    else if (!enabled && processor) {
+        delete processor;
+        processor = nullptr;
+    }
+}
+
+errorState PipelineManager::setAlgorithms(const std::vector<std::string>& names)
+{
+    if (!processor)
+        processor = new FrameProcessor();   // selecting algorithms enables the stage
+    if (!processor->valid())
+        return errorState::OBJECT_CREATION_ERR;
+    processor->setAlgorithms(names);
+    return errorState::NO_ERR;
+}
+
 errorState PipelineManager::buildPipeline()
 {
     if (!source || !sink) return errorState::NULLPTR_ERR;
+
+    const bool useProcessor = processor && processor->valid();
 
     gst_bin_add_many(GST_BIN(pipeline),
         source->sourceElement,
@@ -142,13 +178,26 @@ errorState PipelineManager::buildPipeline()
     gst_object_ref(sink->converter);
     gst_object_ref(sink->sinkElement);
 
+    if (useProcessor) {
+        gst_bin_add_many(GST_BIN(pipeline), processor->filterElement, NULL);
+        gst_object_ref(processor->filterElement);
+    }
+
     struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
-    LinkStep steps[] = {
+    std::vector<LinkStep> steps = {
         { source->sourceElement, source->capsFilter, "source → src-capsfilter"        },
         { source->capsFilter,    source->converter,  "src-capsfilter → src-converter"  },
-        { source->converter,     sink->converter,    "src-converter → sink-queue"      },
-        { sink->converter,       sink->sinkElement,  "sink-queue → sink"               },
     };
+    if (useProcessor) {
+        // Splice the BGR capsfilter in; its src-pad probe processes each buffer
+        // in place (see FrameProcessor), so downstream allocation stays intact.
+        steps.push_back({ source->converter,       processor->filterElement, "src-converter → fp-bgr" });
+        steps.push_back({ processor->filterElement, sink->converter,         "fp-bgr → sink-queue"    });
+    } else {
+        steps.push_back({ source->converter,    sink->converter,        "src-converter → sink-queue" });
+    }
+    steps.push_back({ sink->converter, sink->sinkElement, "sink-queue → sink" });
+
     for (auto& s : steps) {
         if (!gst_element_link(s.from, s.to)) {
             std::cerr << "Failed to link: " << s.desc << "\n";

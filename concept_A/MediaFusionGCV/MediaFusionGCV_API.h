@@ -61,6 +61,17 @@ extern "C" {
 	MEDIAFUSIONGCV_API errorState mediaLib_startStreaming(size_t);
 	MEDIAFUSIONGCV_API errorState mediaLib_stopStreaming(size_t);
 
+	// Returns the socket path a receiver connects to for this pipeline's frames
+	// (empty string for non-IPC sinks). Pointer valid until the next call.
+	MEDIAFUSIONGCV_API const char* mediaLib_getStreamEndpoint(size_t);
+
+	// Real-time OpenCV processing: choose the algorithm chain (comma-separated
+	// names, e.g. "grayscale,canny"; empty string disables processing). Valid
+	// names come from mediaLib_availableAlgorithms() (comma-separated; pointer
+	// valid until the next call).
+	MEDIAFUSIONGCV_API errorState  mediaLib_setAlgorithms(size_t, const char* csvNames);
+	MEDIAFUSIONGCV_API const char* mediaLib_availableAlgorithms();
+
 	MEDIAFUSIONGCV_API size_t mediaLib_delete(size_t);
 	MEDIAFUSIONGCV_API void   mediaLib_destroyAll();
 

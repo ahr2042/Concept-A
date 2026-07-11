@@ -18,6 +18,8 @@
 #include <vector>
 #include <iostream>
 
+class FrameProcessor;   // OpenCV processing stage (see FrameProcessor.h)
+
 class PipelineManager {
 public:
     PipelineManager(SourceType, SinkType, const char*);
@@ -31,11 +33,21 @@ public:
     errorState startStreaming();
     errorState stopStreaming();
 
+    // The endpoint a peer connects to for this pipeline's frames (app/IPC sink),
+    // or "" for non-IPC sinks. Valid once the sink exists (after construction).
+    std::string getStreamEndpoint() const;
+
+    // OpenCV processing stage. Call before startStreaming(); setAlgorithms()
+    // implies enabling. Algorithm names come from availableAlgorithms().
+    void       setProcessingEnabled(bool enabled);
+    errorState setAlgorithms(const std::vector<std::string>& names);
+
 private:
     GstElement*           pipeline       = nullptr;
     GThread*              pipelineThread = nullptr;
     GStreamerSource*       source         = nullptr;
     GStreamerSink*         sink           = nullptr;
+    FrameProcessor*        processor      = nullptr;
     std::atomic<bool>     stopRequested  { false };
 
     errorState      buildPipeline();

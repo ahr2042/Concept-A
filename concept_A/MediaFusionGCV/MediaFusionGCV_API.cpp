@@ -1,5 +1,10 @@
 #include "MediaFusionGCV_API.h"
 #include "PipelineManager.h"
+#include "Algorithms.h"
+
+#include <sstream>
+#include <string>
+#include <vector>
 
 
 
@@ -20,19 +25,18 @@ size_t mediaLib_create(SourceType chosenSourceType, SinkType chosenSinkType, con
 
 size_t mediaLib_delete(size_t pipelineId)
 {
-	if (pipelines[pipelineId] != nullptr)
+	if (pipelineId < pipelines.size())
 	{
 		delete pipelines[pipelineId];
-		pipelines[pipelineId] = nullptr;		
-	}	
-	pipelines.erase(pipelines.begin() + pipelineId);
-	return pipelines.size() - 1;
+		pipelines.erase(pipelines.begin() + pipelineId);
+	}
+	return pipelines.size();
 }
 
 
 errorState mediaLib_init(size_t pipelineId, const char* sourceName, const char* sinkName)
 {
-	if (pipelines[pipelineId] != nullptr)
+	if (pipelineId < pipelines.size() && pipelines[pipelineId] != nullptr)
 	{		
 		errorState result = pipelines[pipelineId]->setSourceElement(sourceName);
 		if (result == errorState::NO_ERR)
@@ -52,6 +56,10 @@ errorState mediaLib_init(size_t pipelineId, const char* sourceName, const char* 
 errorState mediaLib_getDevices(size_t pipelineId, size_t& numberOfDevices, deviceProperties** sourceDevices)
 {
 	if (sourceDevices == nullptr)
+	{
+		return errorState::NULLPTR_ERR;
+	}
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
 	{
 		return errorState::NULLPTR_ERR;
 	}
@@ -80,7 +88,7 @@ errorState mediaLib_getDevices(size_t pipelineId, size_t& numberOfDevices, devic
 
 errorState mediaLib_setDevice(size_t pipelineId, int32_t deviceID, int32_t capIndex)
 {
-	if (pipelines[pipelineId] != nullptr)
+	if (pipelineId < pipelines.size() && pipelines[pipelineId] != nullptr)
 	{
 		return pipelines[pipelineId]->setSourceCaps(deviceID, capIndex);
 	}
@@ -97,12 +105,54 @@ void mediaLib_destroyAll()
 
 errorState mediaLib_startStreaming(size_t pipelineId)
 {
-
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
 	return pipelines[pipelineId]->startStreaming();
 }
 
 errorState mediaLib_stopStreaming(size_t pipelineId)
 {
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
 	return pipelines[pipelineId]->stopStreaming();
+}
+
+const char* mediaLib_getStreamEndpoint(size_t pipelineId)
+{
+	static thread_local std::string endpoint;
+	endpoint.clear();
+	if (pipelineId < pipelines.size() && pipelines[pipelineId] != nullptr)
+		endpoint = pipelines[pipelineId]->getStreamEndpoint();
+	return endpoint.c_str();
+}
+
+errorState mediaLib_setAlgorithms(size_t pipelineId, const char* csvNames)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+
+	std::vector<std::string> names;
+	if (csvNames) {
+		std::stringstream ss(csvNames);
+		std::string item;
+		while (std::getline(ss, item, ',')) {
+			size_t a = item.find_first_not_of(" \t");
+			size_t b = item.find_last_not_of(" \t");
+			if (a != std::string::npos)
+				names.push_back(item.substr(a, b - a + 1));
+		}
+	}
+	return pipelines[pipelineId]->setAlgorithms(names);
+}
+
+const char* mediaLib_availableAlgorithms()
+{
+	static thread_local std::string csv;
+	csv.clear();
+	for (const auto& n : availableAlgorithms()) {
+		if (!csv.empty()) csv += ',';
+		csv += n;
+	}
+	return csv.c_str();
 }
 
