@@ -1,5 +1,8 @@
-#include <gst/check/gstcheck.h>
+// Project headers first: gstcheck.h defines a fail() macro that breaks the
+// <sstream>/<iostream> internals GStreamerSource.h pulls in.
+#include "GStreamerSourceCamera.h"
 #include "MediaFusionGCV_API.h"
+#include <gst/check/gstcheck.h>
 
 // getDevices must succeed or report no camera — never return an unexpected code
 GST_START_TEST(test_getdevices_graceful_no_camera)
@@ -72,6 +75,33 @@ GST_START_TEST(test_setdevice_oob_cap_index)
 }
 GST_END_TEST
 
+// PipeWire devices list DMABuf/DMA_DRM modes the CPU pipeline cannot use —
+// they must not appear in the capture-mode list (selecting one, e.g. the
+// multi-grid tiles' default cap 0, failed start with BUILD_PIPELINE_FAILED)
+GST_START_TEST(test_dma_drm_modes_filtered)
+{
+    GStreamerSourceCamera cam;
+    const size_t before = cam.devicesContainer.size();
+
+    GstCaps* caps = gst_caps_from_string(
+        "video/x-raw(memory:DMABuf), format=(string)DMA_DRM, width=640, height=480, framerate=30/1; "
+        "video/x-raw, format=(string)YUY2, width=640, height=480, framerate=30/1; "
+        "image/jpeg, width=640, height=480, framerate=30/1");
+    fail_unless(caps != nullptr, "test caps failed to parse");
+
+    cam.addDevicePropertie("FakeCam", caps, nullptr);
+    gst_caps_unref(caps);
+
+    fail_unless(cam.devicesContainer.size() == before + 1, "device was not added");
+    const auto* dev = cam.devicesContainer.back();
+    fail_unless(gst_caps_get_size(dev->deviceCapabilities) == 1,
+        "expected exactly 1 usable cap, got %u", gst_caps_get_size(dev->deviceCapabilities));
+    const GstStructure* s0 = gst_caps_get_structure(dev->deviceCapabilities, 0);
+    fail_unless(g_strcmp0(gst_structure_get_string(s0, "format"), "YUY2") == 0,
+        "surviving cap is not the YUY2 mode");
+}
+GST_END_TEST
+
 Suite* device_enumeration_suite()
 {
     Suite*  s  = suite_create("device_enumeration");
@@ -82,6 +112,7 @@ Suite* device_enumeration_suite()
     tcase_add_test(tc, test_setdevice_negative_cap_index);
     tcase_add_test(tc, test_setdevice_oob_device_id);
     tcase_add_test(tc, test_setdevice_oob_cap_index);
+    tcase_add_test(tc, test_dma_drm_modes_filtered);
     suite_add_tcase(s, tc);
     return s;
 }
