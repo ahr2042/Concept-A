@@ -8,6 +8,7 @@
 **Dynamic GStreamer media pipelines with real-time OpenCV processing —
 a C++20 streaming engine driven by a Qt6 operator console over zero-copy IPC.**
 
+[![CI](https://github.com/ahr2042/Concept-A/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ahr2042/Concept-A/actions/workflows/ci.yml)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00f2ff?style=flat-square&logo=cplusplus&logoColor=white&labelColor=131315)](https://en.cppreference.com/w/cpp/20)
 [![Qt](https://img.shields.io/badge/Qt-6.4%2B-00dbe7?style=flat-square&logo=qt&logoColor=white&labelColor=131315)](https://www.qt.io)
 [![GStreamer](https://img.shields.io/badge/GStreamer-1.24-b600f8?style=flat-square&labelColor=131315)](https://gstreamer.freedesktop.org)
@@ -62,7 +63,7 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Telemetry** | Real per-stream FPS & throughput (sink pad probe); real host telemetry — AMD GPU temperature, VRAM, fan, GPU busy %, CPU package temp (hwmon, 1 Hz) |
 | **Observability** | App-wide event log with level filters and CSV export, including the full control-protocol transcript |
 | **Theming** | Generated QSS from design tokens; runtime accent-hue switching |
-| **Verification** | `gstreamer-check` suite (3 suites, 14 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test |
+| **Verification** | `gstreamer-check` suite (3 suites, 14 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
 
 ### Planned
 
