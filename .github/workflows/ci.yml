@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install toolchain and libraries
         run: |
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload page renders
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visionos-page-renders
           path: ci-pages/*.png
