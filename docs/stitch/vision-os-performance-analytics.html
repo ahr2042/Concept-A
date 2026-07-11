@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=JetBrains+Mono:wght@100..800&amp;family=Geist:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #131315;
+            color: #e5e1e4;
+            font-family: 'Geist', sans-serif;
+            overflow-x: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(30, 30, 32, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(58, 73, 75, 0.3);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 12px rgba(0, 242, 255, 0.15);
+        }
+        .glow-purple {
+            box-shadow: 0 0 12px rgba(182, 0, 248, 0.15);
+        }
+        .scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 242, 255, 0.02) 50%);
+            background-size: 100% 4px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#002022",
+                        "surface-container": "#201f21",
+                        "surface-dim": "#131315",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#303032",
+                        "primary-container": "#00f2ff",
+                        "on-surface": "#e5e1e4",
+                        "primary": "#e1fdff",
+                        "on-secondary-fixed": "#320047",
+                        "surface-bright": "#39393b",
+                        "surface-tint": "#00dbe7",
+                        "primary-fixed-dim": "#00dbe7",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e5e1e4",
+                        "on-primary-container": "#006a71",
+                        "tertiary-fixed-dim": "#d1bcff",
+                        "inverse-primary": "#00696f",
+                        "on-tertiary": "#3c0090",
+                        "on-surface-variant": "#b9cacb",
+                        "secondary-fixed": "#f8d8ff",
+                        "error-container": "#93000a",
+                        "on-primary": "#00363a",
+                        "on-background": "#e5e1e4",
+                        "on-secondary": "#520072",
+                        "secondary": "#ebb2ff",
+                        "secondary-container": "#b600f8",
+                        "surface-container-low": "#1b1b1d",
+                        "tertiary-fixed": "#e9ddff",
+                        "on-primary-fixed-variant": "#004f54",
+                        "primary-fixed": "#74f5ff",
+                        "outline": "#849495",
+                        "on-tertiary-fixed-variant": "#5700c9",
+                        "on-secondary-container": "#fff6fc",
+                        "on-tertiary-container": "#7318ff",
+                        "tertiary-container": "#e3d4ff",
+                        "on-tertiary-fixed": "#23005b",
+                        "background": "#131315",
+                        "tertiary": "#fcf5ff",
+                        "secondary-fixed-dim": "#ebb2ff",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#74009f",
+                        "outline-variant": "#3a494b",
+                        "surface-container-lowest": "#0e0e10",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-variant": "#353437",
+                        "surface": "#131315",
+                        "surface-container-highest": "#353437"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "xl": "40px",
+                        "unit": "4px",
+                        "md": "16px",
+                        "container-padding": "24px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Space Grotesk"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-base": ["Geist"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-caps": ["10px", {"lineHeight": "12px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "body-base": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "data-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-lg h-16 z-50 fixed top-0 bg-surface-dim/80 backdrop-blur-xl border-b border-outline-variant/30">
+<div class="flex items-center gap-xl">
+<span class="font-display-lg text-headline-md tracking-tighter text-primary-container drop-shadow-[0_0_8px_rgba(0,242,255,0.5)]">VISION_OS / ALPHA</span>
+<nav class="hidden md:flex gap-md">
+<a class="font-body-base text-body-base text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors px-sm py-1" href="#">Dashboard</a>
+<a class="font-body-base text-body-base text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors px-sm py-1" href="#">Multi-Grid</a>
+<a class="font-body-base text-body-base text-primary border-b-2 border-primary-container pb-1 px-sm" href="#">Analytics</a>
+<a class="font-body-base text-body-base text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors px-sm py-1" href="#">Logs</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-primary-container">videocam</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">photo_camera</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">settings</button>
+<div class="h-8 w-8 rounded-full border border-primary-container/30 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a highly specialized systems engineer wearing dark protective eyewear, illuminated by the cold blue light of multiple monitors in a dark, sophisticated data center environment. The mood is intense and professional, reflecting high-stakes industrial vision analysis." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJffLETQfYW0ZEjl-xrd4jJvQDGsVNFN4VbrQWQGra_E3odYVyK20E6YT44niYr5-KPm-y6itvG5wb6_x9Xeka-GRmFYGftQfkFiKVFxYdwaCmq13dzgwTQr8C16CjTSP51u-gz7K52VOXYQ-NtJudVuQqyVTsWsoOpCPyRwzmu1moesMRRk5EBS0MoamyOy1b8TJiiGwjPgH7LbHgZxau4-v2xcFHHL_7ujvjnb2sCeRLDeC_gsnzFSP6uwLv9ZCUgVQlbr75Tq0"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 bottom-0 flex flex-col z-40 bg-surface-container-low/90 backdrop-blur-md border-r border-outline-variant/20 w-64">
+<div class="p-lg">
+<h2 class="text-primary font-bold font-label-caps text-label-caps tracking-widest">SOURCES</h2>
+<p class="text-[10px] text-on-surface-variant opacity-60 font-data-mono">Live Telemetry Active</p>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex items-center gap-md px-lg py-3 text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all cursor-pointer group">
+<span class="material-symbols-outlined">usb</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">USB Sources</span>
+</div>
+<div class="flex items-center gap-md px-lg py-3 text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all cursor-pointer group">
+<span class="material-symbols-outlined">router</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">RTSP Streams</span>
+</div>
+<div class="flex items-center gap-md px-lg py-3 text-primary-container bg-primary-container/10 border-l-2 border-primary-container cursor-pointer group">
+<span class="material-symbols-outlined">settings_ethernet</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">GigE Vision</span>
+</div>
+<div class="flex items-center gap-md px-lg py-3 text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all cursor-pointer group">
+<span class="material-symbols-outlined">database</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Storage</span>
+</div>
+<div class="flex items-center gap-md px-lg py-3 text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all cursor-pointer group">
+<span class="material-symbols-outlined">lan</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Network</span>
+</div>
+</div>
+<div class="p-lg">
+<button class="w-full py-2 border border-primary-container text-primary-container font-label-caps text-label-caps hover:bg-primary-container/10 transition-all">ADD SOURCE</button>
+</div>
+<div class="mt-auto border-t border-outline-variant/20 py-sm">
+<div class="flex items-center gap-md px-lg py-2 text-on-surface-variant opacity-70 hover:text-primary transition-all cursor-pointer">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-caps text-label-caps">Help</span>
+</div>
+<div class="flex items-center gap-md px-lg py-2 text-on-surface-variant opacity-70 hover:text-primary transition-all cursor-pointer">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-label-caps text-label-caps">System</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 mt-16 p-lg bg-surface-dim min-h-screen">
+<!-- Dashboard Header -->
+<div class="flex justify-between items-end mb-lg">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary tracking-tighter">PERFORMANCE ANALYTICS</h1>
+<div class="flex gap-md mt-sm">
+<span class="flex items-center gap-1 text-primary-container bg-primary-container/5 px-2 py-0.5 border border-primary-container/20 font-data-mono text-data-mono">
+<span class="h-1.5 w-1.5 bg-primary-container rounded-full animate-pulse"></span>
+                        LIVE ENGINE 4.2.0
+                    </span>
+<span class="flex items-center gap-1 text-on-surface-variant font-data-mono text-data-mono">
+                        UPTIME: 142:33:12
+                    </span>
+</div>
+</div>
+<div class="flex gap-sm">
+<div class="glass-panel p-md flex flex-col items-end">
+<span class="font-label-caps text-[10px] text-on-surface-variant opacity-60">AGGREGATE SCORE</span>
+<span class="font-display-lg text-headline-md text-primary-container">98.4<span class="text-xs opacity-50 ml-1">%</span></span>
+</div>
+</div>
+</div>
+<!-- Analytics Grid -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Inference Latency (Large Chart) -->
+<div class="col-span-12 lg:col-span-8 glass-panel overflow-hidden relative group">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary-container glow-cyan"></div>
+<div class="p-md flex justify-between items-center border-b border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-on-surface tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">speed</span>
+                        INFERENCE LATENCY (MS)
+                    </span>
+<div class="flex gap-md font-data-mono text-[10px]">
+<span class="text-primary-container">AVG: 12.4ms</span>
+<span class="text-secondary">P99: 18.2ms</span>
+</div>
+</div>
+<div class="h-64 p-lg relative overflow-hidden scanline">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 800 200">
+<!-- Grid Lines -->
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="800" y1="50" y2="50"></line>
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="800" y1="100" y2="100"></line>
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="800" y1="150" y2="150"></line>
+<!-- Data Path -->
+<path d="M0,120 L50,140 L100,110 L150,130 L200,90 L250,115 L300,70 L350,95 L400,60 L450,100 L500,120 L550,110 L600,140 L650,80 L700,95 L750,105 L800,90" fill="none" stroke="rgba(0, 242, 255, 0.8)" stroke-width="2"></path>
+<path d="M0,120 L50,140 L100,110 L150,130 L200,90 L250,115 L300,70 L350,95 L400,60 L450,100 L500,120 L550,110 L600,140 L650,80 L700,95 L750,105 L800,90 V200 H0 Z" fill="url(#gradient-cyan)"></path>
+<defs>
+<lineargradient id="gradient-cyan" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="rgba(0, 242, 255, 0.2)"></stop>
+<stop offset="100%" stop-color="transparent"></stop>
+</lineargradient>
+</defs>
+</svg>
+<!-- Floating Data Points -->
+<div class="absolute top-1/2 left-1/4 w-3 h-3 bg-primary-container rounded-full glow-cyan border-2 border-surface-dim"></div>
+<div class="absolute top-[30%] left-[37%] w-2 h-2 bg-secondary rounded-full glow-purple border-2 border-surface-dim"></div>
+</div>
+</div>
+<!-- Frame Drop Counter (Vertical Metric) -->
+<div class="col-span-12 md:col-span-6 lg:col-span-4 glass-panel flex flex-col">
+<div class="p-md border-b border-outline-variant/20 bg-surface-container-high/30">
+<span class="font-label-caps text-label-caps text-on-surface tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-sm">warning</span>
+                        FRAME INTEGRITY
+                    </span>
+</div>
+<div class="flex-1 flex flex-col justify-center items-center p-lg">
+<span class="font-data-mono text-display-lg text-error mb-1">0.02<span class="text-xs opacity-50">%</span></span>
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-widest">Total Drops / 24H</span>
+<div class="mt-lg w-full space-y-sm">
+<div class="flex justify-between font-data-mono text-[10px]">
+<span class="text-on-surface-variant">BUFFER OVERFLOW</span>
+<span class="text-primary-container">0</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1">
+<div class="bg-primary-container h-full w-0"></div>
+</div>
+<div class="flex justify-between font-data-mono text-[10px]">
+<span class="text-on-surface-variant">NETWORK JITTER</span>
+<span class="text-error">12</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1">
+<div class="bg-error h-full w-[15%]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Thermal Statistics (Grid) -->
+<div class="col-span-12 lg:col-span-5 glass-panel">
+<div class="p-md border-b border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-on-surface tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">thermostat</span>
+                        THERMAL CLUSTERS
+                    </span>
+</div>
+<div class="p-lg grid grid-cols-3 gap-md">
+<div class="bg-surface-dim p-md border border-outline-variant/20 text-center">
+<span class="block font-label-caps text-[9px] text-on-surface-variant mb-2">GPU CORE</span>
+<span class="font-display-lg text-headline-md text-primary">42<span class="text-xs opacity-50 ml-1">°C</span></span>
+<div class="mt-2 h-1 bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-primary-container w-[42%]"></div>
+</div>
+</div>
+<div class="bg-surface-dim p-md border border-outline-variant/20 text-center">
+<span class="block font-label-caps text-[9px] text-on-surface-variant mb-2">CPU (SOC)</span>
+<span class="font-display-lg text-headline-md text-secondary">58<span class="text-xs opacity-50 ml-1">°C</span></span>
+<div class="mt-2 h-1 bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-secondary w-[58%]"></div>
+</div>
+</div>
+<div class="bg-surface-dim p-md border border-outline-variant/20 text-center">
+<span class="block font-label-caps text-[9px] text-on-surface-variant mb-2">VRAM PKG</span>
+<span class="font-display-lg text-headline-md text-primary">39<span class="text-xs opacity-50 ml-1">°C</span></span>
+<div class="mt-2 h-1 bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-primary-container w-[39%]"></div>
+</div>
+</div>
+</div>
+<div class="px-lg pb-lg">
+<div class="bg-surface-container-low p-md flex items-center gap-md">
+<div class="flex-1">
+<span class="font-label-caps text-[10px] text-on-surface-variant">FAN SPEED: 2450 RPM</span>
+<div class="h-1 bg-surface-container-highest mt-1">
+<div class="bg-primary h-full w-[25%] animate-pulse"></div>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary-container animate-spin" style="animation-duration: 3s">toys_fan</span>
+</div>
+</div>
+</div>
+<!-- Memory Bandwidth (Circular/Status) -->
+<div class="col-span-12 lg:col-span-4 glass-panel">
+<div class="p-md border-b border-outline-variant/20">
+<span class="font-label-caps text-label-caps text-on-surface tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">memory</span>
+                        MEMORY BANDWIDTH
+                    </span>
+</div>
+<div class="p-lg flex gap-lg">
+<div class="w-24 h-24 rounded-full border-4 border-primary-container/20 flex items-center justify-center relative">
+<svg class="absolute inset-0 transform -rotate-90">
+<circle class="text-primary-container" cx="48" cy="48" fill="transparent" r="44" stroke="currentColor" stroke-dasharray="276" stroke-dashoffset="80" stroke-width="4"></circle>
+</svg>
+<span class="font-data-mono text-headline-md text-primary">72<span class="text-xs">%</span></span>
+</div>
+<div class="flex-1 flex flex-col justify-center">
+<div class="mb-2">
+<span class="text-[10px] font-label-caps text-on-surface-variant opacity-60">THROUGHPUT</span>
+<div class="text-headline-md font-display-lg text-primary leading-none">12.4 <span class="text-xs">GB/s</span></div>
+</div>
+<div class="flex gap-2">
+<span class="h-2 w-2 rounded-full bg-primary-container glow-cyan"></span>
+<span class="h-2 w-2 rounded-full bg-surface-container-highest"></span>
+<span class="h-2 w-2 rounded-full bg-surface-container-highest"></span>
+<span class="h-2 w-2 rounded-full bg-surface-container-highest"></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Mini Live Feed -->
+<div class="col-span-12 lg:col-span-3 glass-panel relative group overflow-hidden">
+<img class="w-full h-full object-cover opacity-50 group-hover:scale-105 transition-transform duration-700" data-alt="A cinematic, low-angle shot of complex server hardware and fiber optic cables in a futuristic research facility. Soft neon cyan and purple glows illuminate the metallic surfaces and transparent data ports. The image captures a sense of high-performance computing and ultra-precise digital engineering within a dark mode visual language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATsSoKbZjgwPaEsTDpFg0HrybfE56QkYhiHKp0hDX1LO5CFPoG1FRjF9VuBldJoi412HBuJeMbHBgEljY8EfiweI7Fk8k9mFveh9GaYCXJAH9LD3Dg8iWZNJuvm--JR3Rk9ulAWlHNBJGqDPBI4nw05BZuz3w054D8IF82Hb4ACfdUxY_m1vFc59hBFNRt-TVAzSHucGq6x-5-LiCKfykFvauaIlnx-3gKyj5wWVq3MjDTE-ty0HQuRkaYRUD20N5WeU1kdZw-gIg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent"></div>
+<div class="absolute top-2 left-2 flex items-center gap-1 bg-black/50 px-2 py-1 rounded">
+<span class="h-1.5 w-1.5 bg-error rounded-full animate-pulse"></span>
+<span class="font-data-mono text-[9px] text-on-surface">NODE_01_FEED</span>
+</div>
+<div class="absolute bottom-2 left-2 right-2 flex justify-between items-end">
+<span class="font-label-caps text-[9px] text-primary-container">GPU ACCELERATED</span>
+<span class="material-symbols-outlined text-sm text-on-surface opacity-50">open_in_full</span>
+</div>
+</div>
+<!-- Real-time Event Log -->
+<div class="col-span-12 glass-panel mt-gutter flex flex-col h-64">
+<div class="p-md border-b border-outline-variant/20 flex justify-between items-center bg-surface-container-lowest">
+<span class="font-label-caps text-label-caps text-on-surface tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">list_alt</span>
+                        SYSTEM EVENT LOG [REAL-TIME]
+                    </span>
+<div class="flex gap-md">
+<span class="text-[10px] font-data-mono text-on-surface-variant">FILTER: ALL</span>
+<span class="text-[10px] font-data-mono text-primary-container cursor-pointer">EXPORT .CSV</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto font-data-mono text-[11px] p-md space-y-1 scanline">
+<div class="flex gap-md py-1 border-b border-white/5 opacity-80">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:01.03]</span>
+<span class="text-primary-container w-16 shrink-0">[INFO]</span>
+<span class="text-on-surface">Neural Engine optimization cycle complete. New weights applied.</span>
+</div>
+<div class="flex gap-md py-1 border-b border-white/5">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:05.12]</span>
+<span class="text-secondary w-16 shrink-0">[WARN]</span>
+<span class="text-on-surface">Latent spike detected in GigE_Source_04 (18.2ms). Re-aligning buffer.</span>
+</div>
+<div class="flex gap-md py-1 border-b border-white/5 opacity-80">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:12.44]</span>
+<span class="text-primary-container w-16 shrink-0">[INFO]</span>
+<span class="text-on-surface">VRAM flush initiated. Recovered 420MB overhead.</span>
+</div>
+<div class="flex gap-md py-1 border-b border-white/5 opacity-80">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:18.91]</span>
+<span class="text-primary-container w-16 shrink-0">[INFO]</span>
+<span class="text-on-surface">Handshake success with Distributed Inference Node 09.</span>
+</div>
+<div class="flex gap-md py-1 border-b border-white/5">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:25.01]</span>
+<span class="text-error w-16 shrink-0">[ERR]</span>
+<span class="text-on-surface">Frame drop detected on local bus: Buffer overflow at Port 3.</span>
+</div>
+<div class="flex gap-md py-1 border-b border-white/5 opacity-60">
+<span class="text-on-surface-variant w-24 shrink-0">[14:22:33.15]</span>
+<span class="text-primary-container w-16 shrink-0">[INFO]</span>
+<span class="text-on-surface">Routine thermal health check: All clusters within operational delta.</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB - Hidden on Analytics per rules but logic check: If primary task is Performance monitoring, sometimes a "Create Alert" FAB is used. Suppressing for purity. -->
+</body></html>

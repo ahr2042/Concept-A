@@ -6,8 +6,8 @@
 class GStreamerSinkScreen : public GStreamerSink
 {
 public:
-	GStreamerSinkScreen(ScreenSinks);
+    GStreamerSinkScreen(ScreenSinks);
 private:
-	errorState setSinkElement(std::string);
-
+    errorState setSinkElement(const std::string&) override;
+    errorState setCapsFilterElement(int32_t, int32_t) override;
 };

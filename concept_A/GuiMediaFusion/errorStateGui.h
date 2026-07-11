@@ -1,9 +1,0 @@
-#pragma once
-enum errorStateGui : int32_t
-{
-	NO_ERR,
-	SET_COMBOBOX_ERR,
-	GET_COMBOBOX_ERR,
-	VIEW_CONNECT_ERR,
-	MODEL_CONNECT_ERR
-};

@@ -1,9 +1,19 @@
-#include "pch.h"
 #include "GStreamerSink.h"
 
-GStreamerSink::GStreamerSink()
+// Constructor: device enumeration is on-demand via getSinkDevices(), not called here
+// because iterating the full GStreamer plugin registry is expensive and the list is
+// only needed if the caller explicitly queries available sinks.
+
+GStreamerSink::~GStreamerSink()
 {
-    getSinkDevices();
+    for (auto* dev : devicesContainer) {
+        if (!dev) continue;
+        if (dev->deviceCapabilities) gst_caps_unref(dev->deviceCapabilities);
+        delete dev;
+    }
+    if (sinkElement) { gst_object_unref(sinkElement); sinkElement = nullptr; }
+    if (capsFilter)  { gst_object_unref(capsFilter);  capsFilter  = nullptr; }
+    if (converter)   { gst_object_unref(converter);   converter   = nullptr; }
 }
 
 
@@ -60,7 +70,7 @@ errorState GStreamerSink::getSinkDevices()
     return errorState::NO_ERR;
 }
 
-void GStreamerSink::addDevicePropertie(std::string deviceName, std::string longName, GstCaps* deviceCaps)
+void GStreamerSink::addDevicePropertie(const std::string& deviceName, const std::string& longName, GstCaps* deviceCaps)
 {
     if (deviceName == "Unknown Device" && (deviceCaps == nullptr || gst_caps_is_empty(deviceCaps)))
     {

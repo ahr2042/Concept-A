@@ -12,68 +12,44 @@
 
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
-#include "PipelineConfig.h"
 
+#include <atomic>
 #include <string>
-#include <sstream>
-#include <list>
-#include <memory>
-#include <stdexcept>
-#include <map>
 #include <vector>
 #include <iostream>
 
+class FrameProcessor;   // OpenCV processing stage (see FrameProcessor.h)
 
 class PipelineManager {
 public:
-    PipelineManager(SourceType , SinkType, const char*);
+    PipelineManager(SourceType, SinkType, const char*);
+    ~PipelineManager();
 
-    errorState getSourceInformation(std::list<std::pair<std::string, std::string>>&);
-    //int32_t getSinkDevices(int deviceId, std::list<std::pair<std::string, std::string>>);
-    
-    errorState setSourceElement(std::string);
+    errorState getSourceInformation(std::vector<std::pair<std::string, std::string>>&);
+    errorState setSourceElement(const std::string&);
     errorState setSourceCaps(int32_t, int32_t);
-
-    errorState setSinkElement(std::string);
+    errorState setSinkElement(const std::string&);
     errorState setSinkCaps(int32_t, int32_t);
-
     errorState startStreaming();
     errorState stopStreaming();
 
+    // The endpoint a peer connects to for this pipeline's frames (app/IPC sink),
+    // or "" for non-IPC sinks. Valid once the sink exists (after construction).
+    std::string getStreamEndpoint() const;
 
-    
+    // OpenCV processing stage. Call before startStreaming(); setAlgorithms()
+    // implies enabling. Algorithm names come from availableAlgorithms().
+    void       setProcessingEnabled(bool enabled);
+    errorState setAlgorithms(const std::vector<std::string>& names);
 
 private:
-    GstElement* pipeline = nullptr;
-    GThread* pipleineThread = nullptr;
-    std::vector<GStreamerSource*> mediaSources;
-    std::vector<GStreamerSink*> mediaSinks;
-    errorState buildPipeline();
+    GstElement*           pipeline       = nullptr;
+    GThread*              pipelineThread = nullptr;
+    GStreamerSource*       source         = nullptr;
+    GStreamerSink*         sink           = nullptr;
+    FrameProcessor*        processor      = nullptr;
+    std::atomic<bool>     stopRequested  { false };
+
+    errorState      buildPipeline();
     static gpointer startLoop(gpointer data);
-    struct piplineInfo
-    {
-        SourceType typeOfSource = SourceType::NONE_SOURCE;
-        int32_t numberOfSources = -1;
-        std::string sourceName = "";
-        std::string sourceCap = "";
-
-        int32_t numberOfSinks = -1;
-        std::string sinkName = "";
-        std::string sinkCap = "";
-
-
-    };
-
-    struct _CustomData {
-        GstElement* source;
-        GstElement* convert;
-        GstElement* resample;
-        GstElement* sink;
-        GstElement* pipeline;
-    };
-
-    piplineInfo pipelineManagerInfo;
-
-
-
 };

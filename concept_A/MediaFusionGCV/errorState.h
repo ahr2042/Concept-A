@@ -1,4 +1,5 @@
 #pragma once
+#include <climits>
 #ifdef __cplusplus
 extern "C" {
 #endif

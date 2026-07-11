@@ -4,18 +4,15 @@
 class GStreamerSourceCamera : public GStreamerSource
 {
 public:
-    GStreamerSourceCamera();    
-    std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
+    GStreamerSourceCamera();
+    ~GStreamerSourceCamera() override;
+
+    std::vector<std::pair<std::string, std::string>> getDeviceInfoReadable() override;
 
 private:
-    
-    errorState getSourceDevices();
-    void addDevicePropertie(std::string, GstCaps*);
-    
-    
-    errorState setSourceElement(std::string);
-    //int32_t setConvertElement(std::string);
-    errorState setCapsFilterElement(int32_t,int32_t);
+    errorState getSourceDevices() override;
+    void       addDevicePropertie(const std::string&, GstCaps*, GstDevice*);
 
-      
+    errorState setSourceElement(const std::string&) override;
+    errorState setCapsFilterElement(int32_t, int32_t) override;
 };

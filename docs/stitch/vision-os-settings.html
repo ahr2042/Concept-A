@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=JetBrains+Mono:wght@400..700&amp;family=Geist:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glow-effect:active {
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+        }
+        /* Custom scrollbar for industrial feel */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131315; }
+        ::-webkit-scrollbar-thumb { background: #3a494b; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00dbe7; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#002022",
+                        "surface-container": "#201f21",
+                        "surface-dim": "#131315",
+                        "on-error-container": "#ffdad6",
+                        "inverse-on-surface": "#303032",
+                        "primary-container": "#00f2ff",
+                        "on-surface": "#e5e1e4",
+                        "primary": "#e1fdff",
+                        "on-secondary-fixed": "#320047",
+                        "surface-bright": "#39393b",
+                        "surface-tint": "#00dbe7",
+                        "primary-fixed-dim": "#00dbe7",
+                        "on-error": "#690005",
+                        "inverse-surface": "#e5e1e4",
+                        "on-primary-container": "#006a71",
+                        "tertiary-fixed-dim": "#d1bcff",
+                        "inverse-primary": "#00696f",
+                        "on-tertiary": "#3c0090",
+                        "on-surface-variant": "#b9cacb",
+                        "secondary-fixed": "#f8d8ff",
+                        "error-container": "#93000a",
+                        "on-primary": "#00363a",
+                        "on-background": "#e5e1e4",
+                        "on-secondary": "#520072",
+                        "secondary": "#ebb2ff",
+                        "secondary-container": "#b600f8",
+                        "surface-container-low": "#1b1b1d",
+                        "tertiary-fixed": "#e9ddff",
+                        "on-primary-fixed-variant": "#004f54",
+                        "primary-fixed": "#74f5ff",
+                        "outline": "#849495",
+                        "on-tertiary-fixed-variant": "#5700c9",
+                        "on-secondary-container": "#fff6fc",
+                        "on-tertiary-container": "#7318ff",
+                        "tertiary-container": "#e3d4ff",
+                        "on-tertiary-fixed": "#23005b",
+                        "background": "#131315",
+                        "tertiary": "#fcf5ff",
+                        "secondary-fixed-dim": "#ebb2ff",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#74009f",
+                        "outline-variant": "#3a494b",
+                        "surface-container-lowest": "#0e0e10",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-variant": "#353437",
+                        "surface": "#131315",
+                        "surface-container-highest": "#353437"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "xl": "40px",
+                        "unit": "4px",
+                        "md": "16px",
+                        "container-padding": "24px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Space Grotesk"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-base": ["Geist"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-md": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-caps": ["10px", {"lineHeight": "12px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                        "body-base": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "data-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "0.01em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-base overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface-dim/80 backdrop-blur-xl text-primary font-display-lg text-display-lg Headlines, font-body-base text-body-base Body, font-label-caps text-label-caps UI docked full-width top-0 border-b border-outline-variant/30 flat no shadows flex justify-between items-center w-full px-lg h-16 z-50 fixed">
+<div class="flex items-center gap-md">
+<span class="font-display-lg text-headline-md tracking-tighter text-primary-container drop-shadow-[0_0_8px_rgba(0,242,255,0.5)]">VISION_OS / ALPHA</span>
+<div class="hidden md:flex gap-md ml-xl">
+<a class="text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors Active: scale-95 transition-transform" href="#">Dashboard</a>
+<a class="text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors Active: scale-95 transition-transform" href="#">Multi-Grid</a>
+<a class="text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors Active: scale-95 transition-transform" href="#">Analytics</a>
+<a class="text-on-surface-variant font-medium hover:text-primary-fixed hover:bg-white/5 transition-colors Active: scale-95 transition-transform" href="#">Logs</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">videocam</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">photo_camera</button>
+<button class="material-symbols-outlined text-primary border-b-2 border-primary-container pb-1 transition-colors">settings</button>
+<div class="h-8 w-8 rounded-full border border-outline-variant/50 overflow-hidden ml-sm">
+<img alt="Engineer Profile" data-alt="A professional headshot of a software engineer in a high-tech environment. The lighting is moody and cinematic with subtle blue rim light, reflecting the dark workstation aesthetic. High-definition details show professional attire and a focused expression against a blurred background of glowing server racks and digital monitors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrpxTMjsG_fcIuu3FOj88ps8wE3FGnn3KbcPq9Ym3JJNLliGkuCzxixj-hPUG6Inwte9CgB3b-k0ZiQhbKfOBNdAv5LfHvoD3-9OXneh_vSw9AVuOPGBrjsupTgi6PkRd-1rDWhu7JKpwNdC1V_QXNiEix80ijeLt-tkiPKae9T2qKFgqHc2x0G9varcS1EgBxnGCRBy4fNIoR4aua53ogOHGylq-LNhNGbUrjeEAJCpW5_qZ0QipIT3uBf61CvN8xJBqbRLleATo"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="bg-surface-container-low/90 backdrop-blur-md text-secondary font-label-caps text-label-caps uppercase tracking-widest fixed left-0 top-16 bottom-0 flex flex-col z-40 docked left-0 h-full w-64 border-r border-outline-variant/20 flat no shadows">
+<div class="p-lg border-b border-outline-variant/20 mb-md">
+<div class="flex items-center gap-sm mb-xs">
+<span class="text-primary font-bold">SOURCES</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">sensors</span>
+</div>
+<p class="text-[9px] text-on-surface-variant opacity-70 tracking-normal capitalize">Live Telemetry Active</p>
+</div>
+<div class="flex-1 space-y-1">
+<a class="flex items-center gap-md px-lg py-sm text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all Click: glow-effect duration-300" href="#">
+<span class="material-symbols-outlined">usb</span>
+<span>USB Sources</span>
+</a>
+<a class="flex items-center gap-md px-lg py-sm text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all Click: glow-effect duration-300" href="#">
+<span class="material-symbols-outlined">router</span>
+<span>RTSP Streams</span>
+</a>
+<a class="flex items-center gap-md px-lg py-sm text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all Click: glow-effect duration-300" href="#">
+<span class="material-symbols-outlined">settings_ethernet</span>
+<span>GigE Vision</span>
+</a>
+<a class="flex items-center gap-md px-lg py-sm text-primary-container bg-primary-container/10 border-l-2 border-primary-container Click: glow-effect duration-300" href="#">
+<span class="material-symbols-outlined">database</span>
+<span>Storage</span>
+</a>
+<a class="flex items-center gap-md px-lg py-sm text-on-surface-variant opacity-70 hover:bg-surface-variant/50 hover:text-primary transition-all Click: glow-effect duration-300" href="#">
+<span class="material-symbols-outlined">lan</span>
+<span>Network</span>
+</a>
+</div>
+<div class="p-lg border-t border-outline-variant/20">
+<button class="w-full py-sm border border-primary-container text-primary-container font-label-caps text-[10px] hover:bg-primary-container/10 transition-all mb-md">ADD SOURCE</button>
+<div class="space-y-sm">
+<a class="flex items-center gap-sm text-on-surface-variant opacity-70 hover:text-primary text-[10px]" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+<span>Help</span>
+</a>
+<a class="flex items-center gap-sm text-on-surface-variant opacity-70 hover:text-primary text-[10px]" href="#">
+<span class="material-symbols-outlined text-[18px]">terminal</span>
+<span>System</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-64 mt-16 p-lg h-[calc(100vh-64px)] overflow-y-auto">
+<div class="max-w-6xl mx-auto">
+<header class="mb-xl flex justify-between items-end">
+<div>
+<h1 class="font-display-lg text-display-lg text-primary mb-xs">SYSTEM SETTINGS</h1>
+<p class="font-data-mono text-on-surface-variant opacity-60 uppercase tracking-widest">Global Configuration &amp; Core Runtime Optimization</p>
+</div>
+<div class="flex gap-sm">
+<button class="px-md py-sm bg-surface-container-high border border-outline-variant/30 text-on-surface font-label-caps text-[10px] hover:bg-surface-variant transition-all">EXPORT CONFIG</button>
+<button class="px-md py-sm bg-primary-container text-on-primary-container font-label-caps text-[10px] shadow-[0_0_15px_rgba(0,242,255,0.3)] hover:brightness-110 transition-all">SAVE CHANGES</button>
+</div>
+</header>
+<!-- Tabbed Interface -->
+<div class="flex border-b border-outline-variant/20 mb-lg gap-xl">
+<button class="pb-md font-label-caps text-[11px] text-on-surface-variant hover:text-primary transition-all border-b-2 border-transparent">NETWORK</button>
+<button class="pb-md font-label-caps text-[11px] text-on-surface-variant hover:text-primary transition-all border-b-2 border-transparent">STORAGE</button>
+<button class="pb-md font-label-caps text-[11px] text-primary border-b-2 border-primary-container">CORE RUNTIME</button>
+<button class="pb-md font-label-caps text-[11px] text-on-surface-variant hover:text-primary transition-all border-b-2 border-transparent">API ACCESS</button>
+<button class="pb-md font-label-caps text-[11px] text-on-surface-variant hover:text-primary transition-all border-b-2 border-transparent">UI CUSTOMIZATION</button>
+</div>
+<!-- Bento Grid Layout for Settings -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- AI Acceleration Panel -->
+<section class="col-span-12 lg:col-span-8 bg-surface-container-low/80 backdrop-blur-md border border-outline-variant/20 p-lg relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container shadow-[0_0_10px_rgba(0,242,255,0.5)]"></div>
+<div class="flex justify-between items-center mb-lg">
+<h2 class="font-label-caps text-[12px] text-primary tracking-widest">INFERENCE ACCELERATION</h2>
+<span class="font-data-mono text-[10px] text-primary-container bg-primary-container/10 px-sm py-xs">HARDWARE: NVIDIA RTX 4090</span>
+</div>
+<div class="space-y-md">
+<!-- Toggle Item -->
+<div class="flex items-center justify-between p-md bg-white/5 border border-outline-variant/10">
+<div>
+<h3 class="font-body-base text-on-surface font-bold">TensorRT Engine Acceleration</h3>
+<p class="text-[12px] text-on-surface-variant opacity-70">Leverage NVIDIA TensorRT for high-throughput, low-latency deep learning inference.</p>
+</div>
+<button class="w-12 h-6 bg-primary-container rounded-full relative flex items-center px-1">
+<div class="w-4 h-4 bg-on-primary-container rounded-full ml-auto"></div>
+</button>
+</div>
+<!-- Toggle Item -->
+<div class="flex items-center justify-between p-md bg-white/5 border border-outline-variant/10">
+<div>
+<h3 class="font-body-base text-on-surface font-bold">ONNX Runtime Graph Optimization</h3>
+<p class="text-[12px] text-on-surface-variant opacity-70">Enable static graph optimization for ONNX models during system warm-up.</p>
+</div>
+<button class="w-12 h-6 bg-surface-container-highest rounded-full relative flex items-center px-1">
+<div class="w-4 h-4 bg-outline rounded-full"></div>
+</button>
+</div>
+<!-- Slider Item -->
+<div class="p-md bg-white/5 border border-outline-variant/10">
+<div class="flex justify-between mb-sm">
+<h3 class="font-body-base text-on-surface font-bold">Inference Batch Size</h3>
+<span class="font-data-mono text-primary">08 UNITS</span>
+</div>
+<input class="w-full h-1 bg-surface-container-highest appearance-none cursor-pointer accent-primary-container" max="64" min="1" type="range" value="8"/>
+<div class="flex justify-between mt-xs font-data-mono text-[9px] text-on-surface-variant opacity-50">
+<span>01</span>
+<span>16</span>
+<span>32</span>
+<span>48</span>
+<span>64</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Logging Verbosity Sidebar -->
+<section class="col-span-12 lg:col-span-4 bg-surface-container-low/80 backdrop-blur-md border border-outline-variant/20 p-lg">
+<h2 class="font-label-caps text-[12px] text-primary tracking-widest mb-lg">LOGGING VERBOSITY</h2>
+<div class="flex flex-col gap-sm">
+<button class="flex items-center gap-md p-sm border border-outline-variant/20 text-on-surface-variant hover:bg-surface-variant/30 transition-all text-left">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="font-data-mono text-[11px]">SILENT</span>
+</button>
+<button class="flex items-center gap-md p-sm border border-outline-variant/20 text-on-surface-variant hover:bg-surface-variant/30 transition-all text-left">
+<span class="w-2 h-2 rounded-full bg-primary-container/40"></span>
+<span class="font-data-mono text-[11px]">ERRORS ONLY</span>
+</button>
+<button class="flex items-center gap-md p-sm border border-primary-container bg-primary-container/10 text-primary transition-all text-left">
+<span class="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_8px_rgba(0,242,255,1)]"></span>
+<span class="font-data-mono text-[11px]">DEVELOPER (VERBOSE)</span>
+</button>
+<button class="flex items-center gap-md p-sm border border-outline-variant/20 text-on-surface-variant hover:bg-surface-variant/30 transition-all text-left">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-data-mono text-[11px]">TELEMETRY TRACE</span>
+</button>
+</div>
+<div class="mt-xl p-md border border-error/20 bg-error-container/5 rounded">
+<div class="flex items-center gap-sm text-error mb-xs">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-label-caps text-[10px]">DISK USAGE WARNING</span>
+</div>
+<p class="text-[11px] text-on-surface-variant opacity-70 leading-relaxed">Verbose logging significantly impacts I/O performance. Auto-rotate logs every 512MB.</p>
+</div>
+</section>
+<!-- Visual Theme Customization -->
+<section class="col-span-12 bg-surface-container-low/80 backdrop-blur-md border border-outline-variant/20 p-lg grid grid-cols-1 md:grid-cols-3 gap-lg">
+<div class="col-span-1">
+<h2 class="font-label-caps text-[12px] text-primary tracking-widest mb-md uppercase">UI Customization</h2>
+<p class="text-[12px] text-on-surface-variant opacity-70 mb-lg">Define the visual signature of the Vision OS interface and data overlays.</p>
+<div class="space-y-md">
+<div>
+<label class="font-data-mono text-[10px] text-on-surface-variant mb-xs block">ACCENT HUE</label>
+<div class="flex gap-sm">
+<div class="w-8 h-8 bg-[#00f2ff] ring-2 ring-white/20 cursor-pointer"></div>
+<div class="w-8 h-8 bg-[#b600f8] cursor-pointer"></div>
+<div class="w-8 h-8 bg-[#ebb2ff] cursor-pointer"></div>
+<div class="w-8 h-8 bg-[#ffb4ab] cursor-pointer"></div>
+<div class="w-8 h-8 border border-outline-variant/40 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined text-[16px]">colorize</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-2 grid grid-cols-2 gap-md">
+<div class="p-md bg-white/5 border border-outline-variant/10">
+<div class="flex justify-between items-center mb-sm">
+<span class="font-body-base text-on-surface font-bold">Motion Blur (FX)</span>
+<input checked="" class="rounded-sm bg-surface-dim border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+</div>
+<p class="text-[11px] text-on-surface-variant opacity-60">Apply 4px Gaussian blur to background UI shells for visual depth.</p>
+</div>
+<div class="p-md bg-white/5 border border-outline-variant/10">
+<div class="flex justify-between items-center mb-sm">
+<span class="font-body-base text-on-surface font-bold">Grid Precision</span>
+<span class="font-data-mono text-primary text-[11px]">8PX BASE</span>
+</div>
+<p class="text-[11px] text-on-surface-variant opacity-60">Adjust layout unit density for component positioning.</p>
+</div>
+<div class="p-md bg-white/5 border border-outline-variant/10">
+<div class="flex justify-between items-center mb-sm">
+<span class="font-body-base text-on-surface font-bold">LED Status Pulse</span>
+<input checked="" class="rounded-sm bg-surface-dim border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+</div>
+<p class="text-[11px] text-on-surface-variant opacity-60">Active components will pulse at 0.5Hz for activity indication.</p>
+</div>
+<div class="p-md bg-white/5 border border-outline-variant/10">
+<div class="flex justify-between items-center mb-sm">
+<span class="font-body-base text-on-surface font-bold">Monospace Overlays</span>
+<input checked="" class="rounded-sm bg-surface-dim border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+</div>
+<p class="text-[11px] text-on-surface-variant opacity-60">Force all video overlay text to use JetBrains Mono.</p>
+</div>
+</div>
+</section>
+<!-- System Telemetry Map / Location (Visual Break) -->
+<section class="col-span-12 h-48 bg-surface-container relative overflow-hidden">
+<img alt="Hardware Infrastructure" class="w-full h-full object-cover opacity-30 mix-blend-luminosity" data-alt="A macro close-up of a high-performance server motherboard with glowing cyan circuitry and heat sinks. The image features shallow depth of field, highlighting the intricate technical components and copper heat pipes. The aesthetic is industrial and futuristic, with a dark palette and sharp, cold lighting reflecting the Vision OS style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbrM1uJ7ilwFqHElucIbZtzjiI_V4WnLUtrSQoRymoQe0zla-o9j5f9oF8wzn3KJn0UmQQYkd_5h1JGWXh-jCQUqm2HV6Oj0YNoPFJi8DalXRVMDoIzAPSIsOG0i6ChDZR6ryTLOSDAsJdnwrl7vhFsRpcMFgNtzBvfCn4BfdQdhfFhiO8mlJLZ7Nh3scFXF001d52cVTlQcjVsTWvWT_vT_Mrv0nUf0MD64LW3Gop9faYtkitIE-Wrph7U5E-vegsswTltsTZdec"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+<div class="absolute bottom-md left-md flex items-end gap-xl">
+<div>
+<span class="font-label-caps text-[9px] text-primary block mb-xs">LOCAL SERVER STATUS</span>
+<div class="flex items-center gap-sm">
+<span class="w-3 h-3 bg-primary-container rounded-full animate-pulse shadow-[0_0_10px_rgba(0,242,255,0.8)]"></span>
+<span class="font-display-lg text-headline-md text-on-surface">ALPHA_NODE_04</span>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-lg mb-xs">
+<div class="text-left">
+<span class="font-data-mono text-[9px] text-on-surface-variant uppercase block">TEMP</span>
+<span class="font-data-mono text-primary">42°C</span>
+</div>
+<div class="text-left">
+<span class="font-data-mono text-[9px] text-on-surface-variant uppercase block">LATENCY</span>
+<span class="font-data-mono text-primary">1.2MS</span>
+</div>
+<div class="text-left">
+<span class="font-data-mono text-[9px] text-on-surface-variant uppercase block">UPLINK</span>
+<span class="font-data-mono text-primary">9.4GBPS</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- FAB Suppression: Per guidelines, FAB is hidden on settings screens -->
+</body></html>

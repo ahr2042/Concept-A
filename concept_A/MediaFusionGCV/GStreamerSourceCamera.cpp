@@ -1,180 +1,153 @@
-#include "pch.h"
 #include "GStreamerSourceCamera.h"
 
 GStreamerSourceCamera::GStreamerSourceCamera()
-{    
+{
 #ifdef  _WIN32
-    sourceElement = gst_element_factory_make("mfvideosrc", "camera-source");
-#elif __linux__ 
-    sourceElement = gst_element_factory_make("v4l2src", "camera-source");
+    sourceElement = gst_element_factory_make("mfvideosrc",  "camera-source");
+#elif __linux__
+    sourceElement = gst_element_factory_make("v4l2src",     "camera-source");
 #elif __APPLE__
     sourceElement = gst_element_factory_make("avfvideosrc", "camera-source");
-#endif     
-    getSourceDevices();       
+#endif
+    getSourceDevices();
+}
+
+GStreamerSourceCamera::~GStreamerSourceCamera()
+{
+    for (auto* dev : devicesContainer) {
+        if (!dev) continue;
+        if (dev->gstDevice)          g_object_unref(dev->gstDevice);
+        if (dev->deviceCapabilities) gst_caps_unref(dev->deviceCapabilities);
+        delete dev;
+    }
+    devicesContainer.clear();
 }
 
 errorState GStreamerSourceCamera::getSourceDevices()
 {
-    GstDeviceMonitor* device_monitor = gst_device_monitor_new();
-    if (!device_monitor) {
+    GstDeviceMonitor* monitor = gst_device_monitor_new();
+    if (!monitor)
         return errorState::CREATE_DEVICE_MONITOR_ERR;
-    }
 
-    // Add a filter for video sources
     GstCaps* caps = gst_caps_new_empty_simple("video/x-raw");
-    gst_device_monitor_add_filter(device_monitor, "Video/Source", caps);
+    gst_device_monitor_add_filter(monitor, "Video/Source", caps);
     gst_caps_unref(caps);
 
-    // Start the device monitor
-    if (!gst_device_monitor_start(device_monitor)) {
-        g_object_unref(device_monitor);
+    if (!gst_device_monitor_start(monitor)) {
+        g_object_unref(monitor);
         return errorState::START_DEVICE_MONITOR_ERR;
     }
 
-    // Get a list of devices
-    GList* devices = gst_device_monitor_get_devices(device_monitor);
-    if (devices) {
-        for (GList* l = devices; l != nullptr; l = l->next) {
-            GstDevice* device = GST_DEVICE(l->data);
-            const gchar* name = gst_device_get_display_name(device);
-            GstCaps* caps = gst_device_get_caps(device);
-            addDevicePropertie((name ? name : "Unknown Device"), caps);
-            if (caps)
-            {
-                gst_caps_unref(caps);
-            }
-            g_object_unref(device); // Free the device when done
-        }
-        g_list_free(devices); // Free the list itself
-    }
-    else {
+    GList* devices = gst_device_monitor_get_devices(monitor);
+    if (!devices) {
+        gst_device_monitor_stop(monitor);
+        g_object_unref(monitor);
         return errorState::NO_VIDEO_DEVICE_FOUND_ERR;
     }
 
-    // Stop and clean up
-    gst_device_monitor_stop(device_monitor);
-    g_object_unref(device_monitor);
+    for (GList* l = devices; l; l = l->next) {
+        GstDevice* device = GST_DEVICE(l->data);
+        const gchar* name = gst_device_get_display_name(device);
+        GstCaps* devCaps = gst_device_get_caps(device);
+        addDevicePropertie(name ? name : "Unknown Device", devCaps, device);
+        if (devCaps) gst_caps_unref(devCaps);
+        g_object_unref(device);
+    }
+    g_list_free(devices);
+
+    gst_device_monitor_stop(monitor);
+    g_object_unref(monitor);
     return errorState::NO_ERR;
 }
 
-
-
-void GStreamerSourceCamera::addDevicePropertie(std::string deviceName, GstCaps* deviceCaps)
+static gboolean format_structure_field(GQuark field_id, const GValue* value, gpointer user_data)
 {
-    if (deviceName == "Unknown Device" && (deviceCaps == nullptr || gst_caps_is_empty(deviceCaps)))
-    {
+    auto* dev = static_cast<GStreamerSource::deviceProperties*>(user_data);
+    gchar* value_str = value ? g_strdup_value_contents(value) : nullptr;
+    if (value_str) {
+        dev->formattedDeviceCapabilities
+            << "    " << g_quark_to_string(field_id) << ": " << value_str << "\n";
+        g_free(value_str);
+    }
+    return TRUE;
+}
+
+void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
+                                               GstCaps* deviceCaps, GstDevice* device)
+{
+    if (deviceName == "Unknown Device" && (!deviceCaps || gst_caps_is_empty(deviceCaps)))
+        return;
+
+    GstCaps* rawCaps = gst_caps_new_empty();
+    guint total = deviceCaps ? gst_caps_get_size(deviceCaps) : 0;
+    for (guint i = 0; i < total; ++i) {
+        const GstStructure* s = gst_caps_get_structure(deviceCaps, i);
+        if (s && g_strcmp0(gst_structure_get_name(s), "video/x-raw") == 0)
+            gst_caps_append_structure(rawCaps, gst_structure_copy(s));
+    }
+    if (gst_caps_is_empty(rawCaps)) {
+        gst_caps_unref(rawCaps);
         return;
     }
 
-    deviceProperties* currentDevice = new deviceProperties;
-    currentDevice->deviceName = deviceName;
-    currentDevice->deviceCapabilities = gst_caps_new_empty();
-    for (guint i = 0; i < gst_caps_get_size(deviceCaps); ++i) {
-        GstStructure* structure = gst_structure_copy(gst_caps_get_structure(deviceCaps, i));
-        gst_caps_append_structure(currentDevice->deviceCapabilities, structure);
+    deviceProperties* dev = new deviceProperties;
+    dev->deviceName         = deviceName;
+    dev->gstDevice          = device ? GST_DEVICE(g_object_ref(device)) : nullptr;
+    dev->deviceCapabilities = rawCaps;
+
+    guint n = gst_caps_get_size(dev->deviceCapabilities);
+    for (guint i = 0; i < n; ++i) {
+        const GstStructure* structure = gst_caps_get_structure(dev->deviceCapabilities, i);
+        if (!structure) continue;
+        if (i > 0) dev->formattedDeviceCapabilities << "\n";
+        const gchar* mediaType = gst_structure_get_name(structure);
+        dev->formattedDeviceCapabilities
+            << "  Cap [" << i << "]: " << (mediaType ? mediaType : "Unknown") << "\n";
+        gst_structure_foreach(structure, format_structure_field, dev);
     }
-    devicesContainer.push_back(currentDevice);
+
+    devicesContainer.push_back(dev);
 }
 
-
-
-gboolean process_structure_field(GQuark field_id, const GValue* value, gpointer deviceContainer) {
-    if (!value) {
-        std::cerr << "  Null value encountered in structure field: " << field_id << std::endl;
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Null value encountered in structure field: " << field_id << std::endl;
-        return TRUE;  // Continue gracefully
-    }
-    gchar* value_str = g_strdup_value_contents(value);
-    const gchar* fieldName = g_quark_to_string(field_id);
-    if (value_str) {
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "        " << fieldName << ": " << value_str << std::endl;
-        g_free(value_str);
-    }
-    else {
-        std::cerr << "  Failed to get value contents for field: " << fieldName << std::endl;
-        ((GStreamerSource::deviceProperties*)deviceContainer)->formattedDeviceCapabilities << "  Failed to get value contents for field: " << fieldName << std::endl;
-    }
-    return TRUE;  // Continue iteration
-}
-
-std::list<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
-{    
-    std::list<std::pair<std::string, std::string>> devicesList;
-    size_t totalDevicesNumebr = devicesContainer.size();
-    for (int deviceId = 0; deviceId < totalDevicesNumebr; deviceId++)
-    {
-        if (devicesContainer[deviceId] == nullptr)
-        {                        
-            continue;
-        }
-        for (guint i = 0; i < gst_caps_get_size(devicesContainer[deviceId]->deviceCapabilities); ++i) {
-            const GstStructure* structure = gst_caps_get_structure(devicesContainer[deviceId]->deviceCapabilities, i);
-            if (!structure) {
-                std::cerr << "    Failed to retrieve structure from caps." << std::endl;
-                continue;
-            }
-            if (i > 0)
-            {
-                devicesContainer[deviceId]->formattedDeviceCapabilities << ";";
-            }
-            devicesContainer[deviceId]->formattedDeviceCapabilities << "    Capability " << i + 1 << ":" << std::endl;
-
-            // Print the media type (name of the structure)
-            const gchar* name = gst_structure_get_name(structure);
-            if (name) {
-                devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: " << name << std::endl;
-            }
-            else {
-                devicesContainer[deviceId]->formattedDeviceCapabilities << "      Media Type: Unknown" << std::endl;
-            }
-            // Process and print all fields in the structure
-            gst_structure_foreach(structure, process_structure_field, devicesContainer[deviceId]);
-        }
-        devicesList.push_back(std::make_pair(devicesContainer[deviceId]->deviceName, devicesContainer[deviceId]->formattedDeviceCapabilities.str()));
-    }
-    return devicesList;
-}
-
-
-
-errorState GStreamerSourceCamera::setSourceElement(std::string deviceName)
+std::vector<std::pair<std::string, std::string>> GStreamerSourceCamera::getDeviceInfoReadable()
 {
-    if (sourceElement != nullptr && !deviceName.empty())
-    {
-        g_object_set(sourceElement, "device-name", deviceName.c_str(), NULL);
-        return errorState::NO_ERR;
+    std::vector<std::pair<std::string, std::string>> result;
+    result.reserve(devicesContainer.size());
+    for (const auto* dev : devicesContainer) {
+        if (dev)
+            result.emplace_back(dev->deviceName, dev->formattedDeviceCapabilities.str());
     }
-    return errorState::NULLPTR_ERR;
+    return result;
 }
 
-//int32_t GStreamerSourceCamera::setConvertElement(std::string deviceName)
-//{
-//    if (converter != nullptr && !deviceName.empty())
-//    {
-//        g_object_set(converter, "device-name", deviceName.c_str(), NULL);
-//        return (int32_t)errorState::NO_ERR;
-//    }
-//    return (int32_t)errorState::NULLPTR_ERR;
-//}
-
+errorState GStreamerSourceCamera::setSourceElement(const std::string& /*deviceName*/)
+{
+    // Element is already created in the constructor; device selection is done via setCapsFilterElement.
+    return sourceElement ? errorState::NO_ERR : errorState::NULLPTR_ERR;
+}
 
 errorState GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t capIndex)
 {
-    if (capsFilter != nullptr)
-    {
-        std::string caps = getCapsStringAtIndex(deviceId, capIndex);
-        if (caps.empty())
-        {
-            return errorState::EMPTY_STRING_ERR;
-        }
-        GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
-        if (!capsPtr)
-        {
-            return errorState::OBJECT_CREATION_ERR;
-        }
-        g_object_set(capsFilter, "caps", capsPtr, NULL);
-        gst_caps_unref(capsPtr);
-        return errorState::NO_ERR;
-    }
-    return errorState::NULLPTR_ERR;
+    if (!capsFilter)
+        return errorState::NULLPTR_ERR;
+
+    if (deviceId < 0 || capIndex < 0
+        || static_cast<size_t>(deviceId) >= devicesContainer.size()
+        || !devicesContainer[deviceId])
+        return errorState::NULLPTR_ERR;
+
+    if (devicesContainer[deviceId]->gstDevice && sourceElement)
+        gst_device_reconfigure_element(devicesContainer[deviceId]->gstDevice, sourceElement);
+
+    std::string caps = getCapsStringAtIndex(deviceId, static_cast<guint>(capIndex));
+    if (caps.empty())
+        return errorState::EMPTY_STRING_ERR;
+
+    GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
+    if (!capsPtr)
+        return errorState::OBJECT_CREATION_ERR;
+
+    g_object_set(capsFilter, "caps", capsPtr, NULL);
+    gst_caps_unref(capsPtr);
+    return errorState::NO_ERR;
 }

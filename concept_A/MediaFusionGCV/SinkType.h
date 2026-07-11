@@ -5,6 +5,7 @@ extern "C" {
 
 	enum struct SinkType : int32_t
 	{
+		NONE_SINK,
 		SCREEN_SINK,
 		FILE_SINK,
 		NETWORK_SINK,

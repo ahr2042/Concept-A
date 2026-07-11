@@ -10,40 +10,32 @@
 
 #include <string>
 #include <sstream>
-#include <list>
-#include <memory>
-#include <stdexcept>
-#include <map>
 #include <vector>
 #include <iostream>
 
-
-class GStreamerSink{
+class GStreamerSink {
 public:
-    GStreamerSink();    
+    GStreamerSink() = default;
+    virtual ~GStreamerSink();
+
     struct deviceProperties
     {
-        std::string deviceName = "";
-        std::string longName = "";
-        GstCaps* deviceCapabilities = nullptr;
+        std::string deviceName;
+        std::string longName;
+        GstCaps*    deviceCapabilities = nullptr;
         std::stringstream formattedDeviceCapabilities;
     };
+
     std::vector<deviceProperties*> devicesContainer;
-    //virtual std::list<std::pair<std::string, std::string>> getDeviceInfoReadable();
 
-    virtual errorState getSinkDevices() ;
-    virtual errorState setSinkElement(std::string) { return errorState::NO_ERR; };
-    //virtual int32_t setConvertElement(std::string) ;
-    virtual errorState setCapsFilterElement(int32_t, int32_t) { return errorState::NO_ERR; };
-    virtual void addDevicePropertie(std::string, std::string, GstCaps*) ;
-
-    //std::string getCapsStringAtIndex(int32_t deviceID, guint index);
-
+    virtual errorState getSinkDevices();
+    virtual errorState setSinkElement(const std::string&)     { return errorState::NO_ERR; }
+    virtual errorState setCapsFilterElement(int32_t, int32_t) { return errorState::NO_ERR; }
+    // Non-empty only for IPC sinks: the path/endpoint a peer process connects to.
+    virtual std::string endpoint() const { return {}; }
+    virtual void       addDevicePropertie(const std::string&, const std::string&, GstCaps*);
 
     GstElement* sinkElement = nullptr;
-    GstElement* capsFilter = nullptr;
-    GstElement* converter = nullptr;
-
-
-private:
+    GstElement* capsFilter  = nullptr;
+    GstElement* converter   = nullptr;
 };
