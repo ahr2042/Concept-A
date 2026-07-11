@@ -1,42 +1,51 @@
-#include "stdafx.h"
+// GUIMediaFusion — VISION_OS operator console (Qt6 Widgets + GStreamer).
+// Bootstraps GStreamer (needed by the in-process StreamReceiver), the bundled
+// design fonts and the generated stylesheet, then hands over to MainWindow.
+//
+// --selftest-screenshot <base>   render every page to <base>_N_<name>.png and
+//                                exit (used for offscreen design verification).
 
+#include "MainWindow.h"
+#include "theme/Theme.h"
 
-#include "GuiMediaFusionModel.h"
+#include <gst/gst.h>
 
-//#include <QtWidgets/QApplication>
-//#include "MediaFusionGCV_API.h"
-//#include <iostream>
+#include <QApplication>
+#include <QSettings>
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    //mediaLib_GStreamerInit(argc, argv);
-    //int32_t objectID = mediaLib_create(SourceType::CAMERA_SOURCE, SinkType::SCREEN_SINK, "pipeline");
-    //deviceProperties* foundDevices = nullptr;
-    //size_t numberOfDevices = 0;
-    //errorState result = mediaLib_getDevices(objectID, numberOfDevices, &foundDevices);
-    //if (result == errorState::NO_ERR && foundDevices != nullptr)
-    //{
-    //    for (int i = 0; i < numberOfDevices; i++)
-    //    {
-    //        std::cout << "Device number " << i + 1 << ":" << std::endl;
-    //        std::cout << foundDevices[i].deviceName << std::endl << foundDevices[i].formattedDeviceCapabilities << std::endl;
-    //    }
-    //}
+    // GstVideoOverlay embedding needs a real X11 window id: under a Wayland
+    // session run the GUI through XWayland, and pin GStreamer's GL stack to
+    // X11 as well — otherwise libgstgl sees WAYLAND_DISPLAY, opens a Wayland
+    // GL context, and segfaults when handed our X window handle.
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")
+        && !qEnvironmentVariableIsEmpty("DISPLAY"))
+        qputenv("QT_QPA_PLATFORM", "xcb");
+    if (!qEnvironmentVariableIsEmpty("DISPLAY"))
+        qputenv("GST_GL_WINDOW", "x11");
 
-    //mediaLib_setDevice(objectID, objectID, 0);
-    //mediaLib_startStreaming(objectID);
-    //while (true)
-    //{
+    gst_init(&argc, &argv);
 
-    //}
+    QApplication app(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("ConceptA"));
+    QCoreApplication::setApplicationName(QStringLiteral("VisionOS"));
 
+    theme::loadBundledFonts();
+    theme::setAccent(static_cast<theme::Accent>(
+        QSettings().value(QStringLiteral("ui/accent"), 0).toInt()));
+    app.setStyleSheet(theme::buildStyleSheet());
+    app.setFont(theme::bodyFont(10));
 
-    //
-    //return 0;
+    MainWindow window;
+    window.show();
 
+    const QStringList args = app.arguments();
+    const int shotIdx = args.indexOf(QStringLiteral("--selftest-screenshot"));
+    if (shotIdx >= 0 && shotIdx + 1 < args.size())
+        window.screenshotTour(args.at(shotIdx + 1));
+    if (args.contains(QStringLiteral("--selftest-stream")))
+        window.streamSelfTest();
 
-
-    QApplication a(argc, argv);
-    GuiMediaFusionModel MF_Model(argc, argv);
-    return a.exec();
+    return app.exec();
 }
