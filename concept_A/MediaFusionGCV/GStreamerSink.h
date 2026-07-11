@@ -31,6 +31,8 @@ public:
     virtual errorState getSinkDevices();
     virtual errorState setSinkElement(const std::string&)     { return errorState::NO_ERR; }
     virtual errorState setCapsFilterElement(int32_t, int32_t) { return errorState::NO_ERR; }
+    // Non-empty only for IPC sinks: the path/endpoint a peer process connects to.
+    virtual std::string endpoint() const { return {}; }
     virtual void       addDevicePropertie(const std::string&, const std::string&, GstCaps*);
 
     GstElement* sinkElement = nullptr;
