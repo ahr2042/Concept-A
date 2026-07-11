@@ -45,6 +45,12 @@ jobs:
         run: cmake --build concept_A/MediaFusionGCV/build -j"$(nproc)"
 
       - name: Run engine tests (gstreamer-check)
+        env:
+          # The runner is headless and GPU-less: autovideosink (SCREEN_SINK)
+          # must not probe the GL/EGL sinks — their thread teardown segfaults
+          # the forked gstreamer-check children after the assertions pass.
+          # Ranking fakevideosink highest makes autodetection pick it first.
+          GST_PLUGIN_FEATURE_RANK: fakevideosink:MAX
         run: ctest --test-dir concept_A/MediaFusionGCV/build --output-on-failure
 
       - name: Configure console (GuiMediaFusion)
