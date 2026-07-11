@@ -82,8 +82,20 @@ void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
     guint total = deviceCaps ? gst_caps_get_size(deviceCaps) : 0;
     for (guint i = 0; i < total; ++i) {
         const GstStructure* s = gst_caps_get_structure(deviceCaps, i);
-        if (s && g_strcmp0(gst_structure_get_name(s), "video/x-raw") == 0)
-            gst_caps_append_structure(rawCaps, gst_structure_copy(s));
+        if (!s || g_strcmp0(gst_structure_get_name(s), "video/x-raw") != 0)
+            continue;
+        // Skip modes the CPU pipeline cannot negotiate: structures carrying a
+        // special memory feature (PipeWire's memory:DMABuf with format=DMA_DRM)
+        // lose that annotation on the way to the capsfilter and then match no
+        // software element — start would fail with BUILD_PIPELINE_FAILED.
+        // GPU DMABuf import is a planned feature.
+        GstCapsFeatures* feat = gst_caps_get_features(deviceCaps, i);
+        if (feat && !gst_caps_features_is_any(feat)
+                 && !gst_caps_features_is_equal(feat, GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY))
+            continue;
+        if (g_strcmp0(gst_structure_get_string(s, "format"), "DMA_DRM") == 0)
+            continue;
+        gst_caps_append_structure(rawCaps, gst_structure_copy(s));
     }
     if (gst_caps_is_empty(rawCaps)) {
         gst_caps_unref(rawCaps);

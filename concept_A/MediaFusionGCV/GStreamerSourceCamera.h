@@ -9,9 +9,12 @@ public:
 
     std::vector<std::pair<std::string, std::string>> getDeviceInfoReadable() override;
 
+    // Public like the base-class variant: fed by getSourceDevices() and
+    // directly by the device-filtering regression tests.
+    void addDevicePropertie(const std::string&, GstCaps*, GstDevice*);
+
 private:
     errorState getSourceDevices() override;
-    void       addDevicePropertie(const std::string&, GstCaps*, GstDevice*);
 
     errorState setSourceElement(const std::string&) override;
     errorState setCapsFilterElement(int32_t, int32_t) override;
