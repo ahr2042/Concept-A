@@ -23,6 +23,7 @@ set(SOURCE_FILES
     core/AppLog.cpp
     core/BackendService.cpp
     core/DeviceParser.cpp
+    core/InferenceTypes.cpp
     core/SystemMonitor.cpp
     theme/Theme.cpp
     widgets/Components.cpp
@@ -47,6 +48,7 @@ set(HEADER_FILES
     core/AppLog.h
     core/BackendService.h
     core/DeviceParser.h
+    core/InferenceTypes.h
     core/SystemMonitor.h
     theme/Theme.h
     widgets/Components.h
