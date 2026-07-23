@@ -8,6 +8,9 @@
 #     the console smoke test renders every page under the offscreen Qt
 #     platform (it spawns the engine daemon itself and drives the real
 #     control protocol).
+#   * OpenCV comes from source, not apt: the detector needs 4.8+ to import
+#     current YOLO ONNX exports and 24.04 ships 4.6. The install prefix is
+#     cached, so only the first run (or an OPENCV_VERSION bump) pays for it.
 
 name: CI
 
@@ -22,7 +25,10 @@ jobs:
   build-and-test:
     name: Build & test (Ubuntu 24.04)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
+
+    env:
+      OPENCV_VERSION: 4.12.0
 
     steps:
       - name: Check out sources
@@ -36,7 +42,24 @@ jobs:
             qt6-base-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-gl \
-            libopencv-dev
+            libjpeg-dev libpng-dev zlib1g-dev
+
+      - name: Restore cached OpenCV
+        id: opencv-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: opencv-${{ env.OPENCV_VERSION }}-ubuntu-24.04
+
+      - name: Build OpenCV from source
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: scripts/build-opencv.sh
+
+      - name: Fetch detector models
+        # Best effort: the inference tests skip their model-bound assertions
+        # when no weights are present, so an upstream outage must not fail CI.
+        continue-on-error: true
+        run: scripts/fetch-models.sh
 
       - name: Configure engine (MediaFusionGCV)
         run: cmake -S concept_A/MediaFusionGCV -B concept_A/MediaFusionGCV/build
