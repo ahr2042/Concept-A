@@ -3,6 +3,7 @@
 #include "GStreamerSinkScreen.h"
 #include "GStreamerSinkApplication.h"
 #include "FrameProcessor.h"
+#include "ModelRegistry.h"
 
 PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const char* pipelineName)
 {
@@ -153,6 +154,47 @@ errorState PipelineManager::setAlgorithms(const std::vector<std::string>& names)
         return errorState::OBJECT_CREATION_ERR;
     processor->setAlgorithms(names);
     return errorState::NO_ERR;
+}
+
+errorState PipelineManager::setDetectorModel(const std::string& modelNameOrPath)
+{
+    // Resolve the name up front. The chain usually has no detector in it yet
+    // (the console picks a model before deploying), and without this check a
+    // typo would be accepted here and only surface later as an idle stage.
+    ModelInfo info;
+    if (!modelNameOrPath.empty() && !findModel(modelNameOrPath, info))
+        return errorState::LOAD_MODEL_ERR;
+
+    if (!processor)
+        processor = new FrameProcessor();   // model choice survives until "detect" is selected
+    if (!processor->valid())
+        return errorState::OBJECT_CREATION_ERR;
+
+    DetectorConfig cfg = processor->detectorConfig();
+    cfg.model = modelNameOrPath;
+    if (!processor->setDetectorConfig(cfg))
+        return errorState::LOAD_MODEL_ERR;
+    return errorState::NO_ERR;
+}
+
+errorState PipelineManager::setDetectorParams(float confidence, float nms, bool drawBoxes)
+{
+    if (!processor)
+        processor = new FrameProcessor();
+    if (!processor->valid())
+        return errorState::OBJECT_CREATION_ERR;
+
+    DetectorConfig cfg = processor->detectorConfig();
+    cfg.confidence = confidence;
+    cfg.nms        = nms;
+    cfg.drawBoxes  = drawBoxes;
+    processor->setDetectorConfig(cfg);      // thresholds alone cannot fail to load
+    return errorState::NO_ERR;
+}
+
+bool PipelineManager::inferenceStats(InferenceStats& out) const
+{
+    return processor && processor->valid() && processor->inferenceStats(out);
 }
 
 errorState PipelineManager::buildPipeline()

@@ -24,6 +24,7 @@ extern "C" {
 		BUILD_PIPELINE_FAILED,
 		START_STREAMING_FAILED,
 		STOP_STREAMING_FAILED,
+		LOAD_MODEL_ERR,
 		NO_ERR
 	};
 #ifdef __cplusplus

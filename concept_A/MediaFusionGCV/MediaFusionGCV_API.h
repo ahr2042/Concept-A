@@ -18,6 +18,10 @@
 #include <string>
 #include <stdint.h>
 
+// Outside the extern "C" block below: it declares std::string/std::vector
+// members, and templates cannot have C linkage.
+#include "InferenceStats.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -71,6 +75,22 @@ extern "C" {
 	// valid until the next call).
 	MEDIAFUSIONGCV_API errorState  mediaLib_setAlgorithms(size_t, const char* csvNames);
 	MEDIAFUSIONGCV_API const char* mediaLib_availableAlgorithms();
+
+	// Inference stage — configures the "detect" algorithm. The model is loaded
+	// on the spot, so LOAD_MODEL_ERR here means a missing or unreadable graph;
+	// an empty name unloads it. Detector settings are remembered per pipeline
+	// and survive changes to the algorithm chain.
+	MEDIAFUSIONGCV_API errorState  mediaLib_setDetectorModel(size_t, const char* modelNameOrPath);
+	MEDIAFUSIONGCV_API errorState  mediaLib_setDetectorParams(size_t, float confidence,
+	                                                          float nms, bool drawBoxes);
+
+	// One model per line: "name=<stem> classes=<n> input=<px> path=<file>".
+	// Empty when no weights are installed. Pointer valid until the next call.
+	MEDIAFUSIONGCV_API const char* mediaLib_availableModels();
+
+	// Last completed inference for this pipeline. NULLPTR_ERR for a bad id,
+	// NOT_IMPLEMENTED_YET_ERR when the chain has no inference stage.
+	MEDIAFUSIONGCV_API errorState  mediaLib_getInferenceStats(size_t, InferenceStats&);
 
 	MEDIAFUSIONGCV_API size_t mediaLib_delete(size_t);
 	MEDIAFUSIONGCV_API void   mediaLib_destroyAll();

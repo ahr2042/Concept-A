@@ -4,6 +4,7 @@
 #include <gst/video/video.h>
 
 #include "Algorithm.h"
+#include "Detector.h"
 
 #include <memory>
 #include <mutex>
@@ -39,11 +40,22 @@ public:
     void                     setAlgorithms(const std::vector<std::string>& names);
     std::vector<std::string> activeAlgorithms() const;
 
+    // Inference-stage settings. They live here rather than inside the detector
+    // because setAlgorithms() rebuilds the chain from names — the selected
+    // model has to survive that, and has to be applied to a detector that
+    // joins the chain later. Returns false if the model could not be loaded.
+    bool           setDetectorConfig(const DetectorConfig& cfg);
+    DetectorConfig detectorConfig() const;
+
+    // Stats from the inference stage; false when no detector is in the chain.
+    bool inferenceStats(InferenceStats& out) const;
+
 private:
     static GstPadProbeReturn onBuffer(GstPad* pad, GstPadProbeInfo* info, gpointer user);
     GstPadProbeReturn        processBuffer(GstPad* pad, GstPadProbeInfo* info);
 
     std::vector<std::unique_ptr<Algorithm>> m_algos;
+    DetectorConfig                          m_detectorConfig;
     mutable std::mutex                      m_mutex;
     GstVideoInfo                            m_info;
     bool                                    m_haveInfo = false;
