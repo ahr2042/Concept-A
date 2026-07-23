@@ -45,6 +45,7 @@ static std::string errStr(errorState e)
         case errorState::BUILD_PIPELINE_FAILED:     return "BUILD_PIPELINE_FAILED";
         case errorState::START_STREAMING_FAILED:    return "START_STREAMING_FAILED";
         case errorState::STOP_STREAMING_FAILED:     return "STOP_STREAMING_FAILED";
+        case errorState::LOAD_MODEL_ERR:            return "LOAD_MODEL_ERR";
         case errorState::SET_SOURCE_ELEMENT_ERR:    return "SET_SOURCE_ELEMENT_ERR";
         case errorState::SET_SINK_ELEMENT_ERR:      return "SET_SINK_ELEMENT_ERR";
         case errorState::SET_SOURCE_CAPS_ERR:       return "SET_SOURCE_CAPS_ERR";
@@ -99,6 +100,12 @@ static std::string helpText()
         << "                                       path the GUI connects unixfdsrc to\n"
         << "  6. stop 0                         -- stops streaming\n"
         << "\n"
+        << "Object detection (needs a model -- see scripts/fetch-models.sh):\n"
+        << "  models                            -- lists the installed ONNX models\n"
+        << "  model 0 yolov5n                   -- loads one into pipeline 0\n"
+        << "  algos 0 detect                    -- puts the inference stage in the chain\n"
+        << "  stats 0                           -- inference latency and last detections\n"
+        << "\n"
         << "Commands:\n"
         << "  create <src> <snk> <name>        Create a pipeline\n"
         << "    src: none(0) file(1) camera(2) network(3) screen(4) test(5) custom(6)\n"
@@ -107,6 +114,11 @@ static std::string helpText()
         << "  set-device <id> <dev> <cap>      Select Device [dev] Cap [cap] from 'devices' output\n"
         << "  algos <id> <csv>                 Set OpenCV algorithm chain (empty csv disables)\n"
         << "  algos-list                       List available algorithm names\n"
+        << "  models                           List installed detector models\n"
+        << "  model <id> [name]                Load a detector model (no name unloads it)\n"
+        << "  detect-params <id> <conf> <nms> [draw]\n"
+        << "                                   Detector thresholds (0..1) and box overlay (0/1)\n"
+        << "  stats <id>                       Inference latency and last detections\n"
         << "  start <id>                       Start streaming (app sink -> prints socket path)\n"
         << "  stop <id>                        Stop streaming\n"
         << "  delete <id>                      Delete pipeline\n"
@@ -216,6 +228,76 @@ static std::string handleCommand(const std::string& line)
     }
     else if (cmd == "algos-list") {
         out << "OK " << mediaLib_availableAlgorithms() << "\n";
+    }
+    else if (cmd == "models") {
+        const std::string listing = mediaLib_availableModels();
+        size_t count = static_cast<size_t>(std::count(listing.begin(), listing.end(), '\n'));
+        out << "OK " << count << " model(s)\n" << listing;
+        if (count == 0)
+            out << "  none installed -- run scripts/fetch-models.sh\n";
+    }
+    else if (cmd == "model") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS model <id> [name]  (no name unloads)\n";
+        else {
+            std::string name;
+            iss >> name;                                  // absent -> unload
+            errorState err = mediaLib_setDetectorModel(id, name.c_str());
+            if (err == errorState::NO_ERR)
+                out << "OK " << (name.empty() ? "unloaded" : name) << "\n";
+            else {
+                out << "ERR " << errStr(err) << "\n";
+                if (err == errorState::LOAD_MODEL_ERR)
+                    out << "  hint: run 'models' for installed names\n";
+            }
+        }
+    }
+    else if (cmd == "detect-params") {
+        size_t id = 0;
+        float  conf = 0.0f, nms = 0.0f;
+        if (!(iss >> id >> conf >> nms))
+            out << "ERR INVALID_ARGS detect-params <id> <confidence> <nms> [draw]\n";
+        else if (conf < 0.0f || conf > 1.0f || nms < 0.0f || nms > 1.0f)
+            out << "ERR INVALID_ARGS confidence and nms must be in 0..1\n";
+        else {
+            int draw = 1;
+            iss >> draw;                                  // optional, defaults to on
+            errorState err = mediaLib_setDetectorParams(id, conf, nms, draw != 0);
+            out << (err == errorState::NO_ERR ? "OK\n" : ("ERR " + errStr(err) + "\n"));
+        }
+    }
+    else if (cmd == "stats") {
+        size_t id = 0;
+        if (!(iss >> id))
+            out << "ERR INVALID_ARGS stats <id>\n";
+        else {
+            InferenceStats st;
+            errorState err = mediaLib_getInferenceStats(id, st);
+            if (err == errorState::NOT_IMPLEMENTED_YET_ERR) {
+                // No inference stage in this pipeline — a normal state, not a
+                // failure: report it in the same shape so clients parse one form.
+                out << "OK model= loaded=0 infer_ms=0 avg_ms=0 inferred=0 skipped=0"
+                       " objects=0 avg_conf=0\n";
+            } else if (err != errorState::NO_ERR) {
+                out << "ERR " << errStr(err) << "\n";
+            } else {
+                out << "OK model=" << st.modelName
+                    << " loaded="   << (st.modelLoaded ? 1 : 0)
+                    << " infer_ms=" << st.inferenceMs
+                    << " avg_ms="   << st.avgInferenceMs
+                    << " inferred=" << st.framesInferred
+                    << " skipped="  << st.framesSkipped
+                    << " objects="  << st.objectCount
+                    << " avg_conf=" << st.avgConfidence << "\n";
+                for (const auto& d : st.detections)
+                    out << "det conf=" << d.confidence
+                        << " box="     << d.x << "," << d.y << "," << d.width << "," << d.height
+                        << " label="   << d.label << "\n";   // label last: it may contain spaces
+                if (!st.lastError.empty())
+                    out << "error=" << st.lastError << "\n";
+            }
+        }
     }
     else if (cmd == "start") {
         size_t id = 0;
