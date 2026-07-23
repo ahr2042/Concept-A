@@ -1,4 +1,5 @@
 #include "Algorithms.h"
+#include "Detector.h"
 
 #include <opencv2/imgproc.hpp>
 
@@ -38,10 +39,12 @@ std::unique_ptr<Algorithm> makeAlgorithm(const std::string& name)
 {
     if (name == "grayscale") return std::make_unique<GrayscaleAlgorithm>();
     if (name == "canny")     return std::make_unique<CannyEdgesAlgorithm>();
+    // Starts idle; FrameProcessor hands it the selected model right after.
+    if (name == "detect")    return std::make_unique<DetectorAlgorithm>();
     return nullptr;
 }
 
 std::vector<std::string> availableAlgorithms()
 {
-    return { "grayscale", "canny" };
+    return { "grayscale", "canny", "detect" };
 }

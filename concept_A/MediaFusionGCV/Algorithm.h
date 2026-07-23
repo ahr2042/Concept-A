@@ -1,5 +1,7 @@
 #pragma once
 
+#include "InferenceStats.h"
+
 #include <opencv2/core.hpp>
 
 // One image-processing / AI step applied to a frame, in place.
@@ -19,4 +21,10 @@ public:
     virtual ~Algorithm() = default;
     virtual const char* name() const = 0;
     virtual void        apply(cv::Mat& frame) = 0;
+
+    // Optional: an inference stage reports what it last produced here so the
+    // control protocol can serve DETECTION_SUMMARY / latency telemetry without
+    // knowing which concrete Algorithm is in the chain. Plain image ops leave
+    // this alone and return false. Must be safe to call from another thread.
+    virtual bool snapshotStats(InferenceStats& out) const { (void)out; return false; }
 };
