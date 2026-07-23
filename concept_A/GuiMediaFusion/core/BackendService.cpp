@@ -15,11 +15,12 @@ BackendWorker::~BackendWorker()
     delete m_client;
 }
 
-bool BackendWorker::cmd(const QString& line, QString& reply)
+bool BackendWorker::cmd(const QString& line, QString& reply, bool quiet)
 {
     if (!m_client || !m_client->connected())
         return false;
-    emit wire(AppLog::Debug, QStringLiteral("→ %1").arg(line));
+    if (!quiet)
+        emit wire(AppLog::Debug, QStringLiteral("→ %1").arg(line));
     std::string resp;
     if (!m_client->command(line.toStdString(), resp)) {
         emit wire(AppLog::Err, QStringLiteral("control link lost while sending '%1'").arg(line));
@@ -28,7 +29,8 @@ bool BackendWorker::cmd(const QString& line, QString& reply)
         return false;
     }
     reply = QString::fromStdString(resp).trimmed();
-    emit wire(AppLog::Debug, QStringLiteral("← %1").arg(reply.left(160)));
+    if (!quiet)
+        emit wire(AppLog::Debug, QStringLiteral("← %1").arg(reply.left(160)));
     return true;
 }
 
@@ -107,8 +109,69 @@ void BackendWorker::queryAlgorithms()
     emit algorithmsReady(algos);
 }
 
+void BackendWorker::queryModels()
+{
+    QString reply;
+    QVector<DetectorModel> models;
+    if (cmd(QStringLiteral("models"), reply))
+        inferenceparser::parseModels(reply, models);
+    emit modelsReady(models);
+}
+
+// Sends the model + thresholds for one daemon pipeline. `detail` carries the
+// daemon's complaint when this returns false.
+bool BackendWorker::sendDetector(long daemonId, const QString& model,
+                                 double confidence, double nms, bool drawBoxes,
+                                 QString& detail)
+{
+    QString reply;
+    // Order matters: load the graph first, so the thresholds land on a detector
+    // that already has a net and the console never shows a configured-but-empty
+    // stage.
+    if (!cmd(QStringLiteral("model %1 %2").arg(daemonId).arg(model), reply)
+        || !reply.startsWith(QStringLiteral("OK"))) {
+        detail = reply;
+        return false;
+    }
+    if (!cmd(QStringLiteral("detect-params %1 %2 %3 %4")
+                 .arg(daemonId).arg(confidence, 0, 'f', 3).arg(nms, 0, 'f', 3)
+                 .arg(drawBoxes ? 1 : 0), reply)
+        || !reply.startsWith(QStringLiteral("OK"))) {
+        detail = reply;
+        return false;
+    }
+    return true;
+}
+
+void BackendWorker::applyDetector(int sessionId, const QString& model,
+                                  double confidence, double nms, bool drawBoxes)
+{
+    if (!m_sessions.contains(sessionId)) {
+        emit detectorApplied(sessionId, false, QStringLiteral("no such session"));
+        return;
+    }
+    QString detail;
+    const bool ok = sendDetector(m_sessions.value(sessionId), model,
+                                 confidence, nms, drawBoxes, detail);
+    emit detectorApplied(sessionId, ok, ok ? model : detail);
+}
+
+void BackendWorker::pollStats()
+{
+    for (auto it = m_sessions.constBegin(); it != m_sessions.constEnd(); ++it) {
+        QString reply;
+        if (!cmd(QStringLiteral("stats %1").arg(it.value()), reply, /*quiet=*/true))
+            return;                       // link went down; nothing else will work either
+        InferenceSnapshot snap;
+        if (inferenceparser::parseStats(reply, snap))
+            emit inferenceStats(it.key(), snap);
+    }
+}
+
 void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
-                           const QString& algosCsv, bool screenSink, const QString& name)
+                           const QString& algosCsv, bool screenSink, const QString& name,
+                           const QString& detectorModel, double confidence, double nms,
+                           bool drawBoxes)
 {
     const long id = createPipeline(QStringLiteral("camera"),
                                    screenSink ? QStringLiteral("screen") : QStringLiteral("app"),
@@ -127,6 +190,17 @@ void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
         emit sessionFailed(sessionId, QStringLiteral("set-device %1/%2 rejected: %3")
                                           .arg(deviceIndex).arg(capIndex).arg(reply));
         return;
+    }
+
+    // Load the detector before the chain is set: makeAlgorithm("detect") picks
+    // up the configured model as it is built, so inference is live on the first
+    // frame instead of after a reconfigure.
+    if (!detectorModel.isEmpty()) {
+        QString detail;
+        if (sendDetector(id, detectorModel, confidence, nms, drawBoxes, detail))
+            emit detectorApplied(sessionId, true, detectorModel);
+        else
+            emit detectorApplied(sessionId, false, detail);
     }
 
     // Always send algos — an empty csv explicitly disables processing.
@@ -208,6 +282,8 @@ BackendService::BackendService(QObject* parent)
     , m_binary(defaultBinaryPath())
 {
     qRegisterMetaType<QVector<DeviceInfo>>("QVector<DeviceInfo>");
+    qRegisterMetaType<QVector<DetectorModel>>("QVector<DetectorModel>");
+    qRegisterMetaType<InferenceSnapshot>("InferenceSnapshot");
 
     m_worker = new BackendWorker;
     m_worker->moveToThread(&m_thread);
@@ -233,7 +309,52 @@ BackendService::BackendService(QObject* parent)
         logErr("STREAM", QStringLiteral("session %1 failed: %2").arg(id).arg(err));
         emit sessionFailed(id, err);
     });
+    connect(m_worker, &BackendWorker::modelsReady, this, [this](const QVector<DetectorModel>& m) {
+        m_models = m;
+        QStringList names;
+        for (const DetectorModel& d : m) names << d.name;
+        logInfo("CTL", QStringLiteral("detector models: %1")
+                           .arg(names.isEmpty() ? QStringLiteral("(none — run scripts/fetch-models.sh)")
+                                                : names.join(", ")));
+        emit modelsChanged(m);
+    });
+    connect(m_worker, &BackendWorker::detectorApplied, this,
+            [this](int id, bool ok, const QString& detail) {
+        if (ok)
+            logInfo("AI", QStringLiteral("session %1 model '%2' loaded").arg(id).arg(detail));
+        else
+            logErr("AI", QStringLiteral("session %1 model rejected: %2").arg(id).arg(detail));
+        emit detectorChanged(id, ok, detail);
+    });
+    connect(m_worker, &BackendWorker::inferenceStats, this, [this](int id, const InferenceSnapshot& s) {
+        // Log what changed, not every sample: the poll runs at 1 Hz per session
+        // and an unchanging scene would otherwise fill the event feed.
+        QStringList labels;
+        for (const DetectionBox& d : s.detections)
+            labels << d.label;
+        labels.sort();
+        const QString fingerprint = labels.join(QLatin1Char(','));
+        if (s.active() && fingerprint != m_lastDetections.value(id)) {
+            m_lastDetections.insert(id, fingerprint);
+            logInfo("AI", labels.isEmpty()
+                ? QStringLiteral("session %1: no objects").arg(id)
+                : QStringLiteral("session %1: %2 object(s) — %3")
+                      .arg(id).arg(labels.size()).arg(labels.join(QStringLiteral(", "))));
+        }
+        emit inferenceStatsChanged(id, s);
+    });
     connect(m_worker, &BackendWorker::wire, this, &BackendService::onWire);
+
+    // Inference telemetry poll. The detector publishes asynchronously, so this
+    // is a plain 1 Hz sample of the newest result rather than a per-frame feed;
+    // it is quiet on the wire log and idles harmlessly with no sessions open.
+    m_statsTimer = new QTimer(this);
+    m_statsTimer->setInterval(1000);
+    connect(m_statsTimer, &QTimer::timeout, this, [this] {
+        if (m_state == DaemonState::Online)
+            QMetaObject::invokeMethod(m_worker, &BackendWorker::pollStats, Qt::QueuedConnection);
+    });
+    m_statsTimer->start();
 
     m_thread.setObjectName(QStringLiteral("backend-ctl"));
     m_thread.start();
@@ -326,6 +447,7 @@ void BackendService::onWorkerConnected(bool ok, const QString& socketPath)
         logInfo("CTL", QStringLiteral("control link online at %1").arg(socketPath));
         setState(DaemonState::Online);
         refreshAlgorithms();
+        refreshModels();
         refreshDevices();
         return;
     }
@@ -402,14 +524,29 @@ void BackendService::refreshAlgorithms()
     QMetaObject::invokeMethod(m_worker, &BackendWorker::queryAlgorithms, Qt::QueuedConnection);
 }
 
+void BackendService::refreshModels()
+{
+    QMetaObject::invokeMethod(m_worker, &BackendWorker::queryModels, Qt::QueuedConnection);
+}
+
 int BackendService::deploy(const DeploySpec& spec)
 {
     const int sessionId = m_nextSession++;
     QMetaObject::invokeMethod(m_worker, [w = m_worker, sessionId, spec] {
         w->deploy(sessionId, spec.deviceIndex, spec.capIndex, spec.algosCsv,
-                  spec.screenSink, spec.name);
+                  spec.screenSink, spec.name, spec.detectorModel,
+                  spec.confidence, spec.nms, spec.drawBoxes);
     }, Qt::QueuedConnection);
     return sessionId;
+}
+
+void BackendService::setDetector(int sessionId, const QString& model,
+                                 double confidence, double nms, bool drawBoxes)
+{
+    QMetaObject::invokeMethod(m_worker,
+        [w = m_worker, sessionId, model, confidence, nms, drawBoxes] {
+            w->applyDetector(sessionId, model, confidence, nms, drawBoxes);
+        }, Qt::QueuedConnection);
 }
 
 void BackendService::stop(int sessionId)

@@ -170,6 +170,7 @@ PipelinePage::PipelinePage(BackendService* service, QWidget* parent)
     connect(m_canvas, &NodeCanvas::nodeSelected, this, &PipelinePage::showNodeProps);
     connect(m_service, &BackendService::devicesChanged,    this, &PipelinePage::onDevices);
     connect(m_service, &BackendService::algorithmsChanged, this, &PipelinePage::onAlgorithms);
+    connect(m_service, &BackendService::modelsChanged,     this, &PipelinePage::onModels);
     connect(m_service, &BackendService::sessionStarted,    this, &PipelinePage::onSessionStarted);
     connect(m_service, &BackendService::sessionStopped,    this, &PipelinePage::onSessionStopped);
     connect(m_service, &BackendService::sessionFailed,     this, &PipelinePage::onSessionFailed);
@@ -247,17 +248,23 @@ QWidget* PipelinePage::buildPropertiesPanel()
 
     procLay->addWidget(vos::makeHSeparator(proc));
     auto* aiRow = new QHBoxLayout;
-    aiRow->addWidget(vos::capsLabel(QStringLiteral("AI INFERENCE (ONNX)"), 8, proc));
-    aiRow->addWidget(new vos::Badge(QStringLiteral("PLANNED"), vos::Badge::Planned, proc));
+    aiRow->addWidget(vos::capsLabel(QStringLiteral("AI INFERENCE (OPENCV DNN)"), 8, proc));
     aiRow->addStretch(1);
     procLay->addLayout(aiRow);
-    auto* onnxToggleRow = new QHBoxLayout;
-    onnxToggleRow->addWidget(vos::dataLabel(QStringLiteral("ONNX RUNTIME"), 10, proc));
-    onnxToggleRow->addStretch(1);
-    auto* onnxToggle = new vos::ToggleSwitch(proc);
-    vos::markPlanned(onnxToggle);
-    onnxToggleRow->addWidget(onnxToggle);
-    procLay->addLayout(onnxToggleRow);
+    procLay->addWidget(vos::capsLabel(QStringLiteral("DETECTION MODEL"), 8, proc));
+    m_modelBox = new QComboBox(proc);
+    m_modelBox->addItem(QStringLiteral("QUERYING…"));
+    m_modelBox->setEnabled(false);
+    m_modelBox->setToolTip(QStringLiteral(
+        "The model the DETECT algorithm runs. Tick DETECT above to put the\n"
+        "inference stage in this node's chain."));
+    procLay->addWidget(m_modelBox);
+    auto* aiHint = new QLabel(QStringLiteral(
+        "Inference runs on a worker thread; the pad probe overlays the newest "
+        "result, so detection cost does not throttle the stream."), proc);
+    aiHint->setWordWrap(true);
+    aiHint->setProperty("vosHint", true);
+    procLay->addWidget(aiHint);
     procLay->addStretch(1);
     m_propsStack->addWidget(proc);
 
@@ -319,6 +326,23 @@ void PipelinePage::onDevices(const QVector<DeviceInfo>& devices)
     m_deployBtn->setEnabled(!devices.isEmpty() && m_sessionId < 0);
 }
 
+void PipelinePage::onModels(const QVector<DetectorModel>& models)
+{
+    if (!m_modelBox)
+        return;
+    m_modelBox->clear();
+    if (models.isEmpty()) {
+        m_modelBox->addItem(QStringLiteral("NO_MODEL_INSTALLED"));
+        m_modelBox->setEnabled(false);
+        m_modelBox->setToolTip(QStringLiteral("No weights in models/ — run scripts/fetch-models.sh"));
+        return;
+    }
+    for (const DetectorModel& m : models)
+        m_modelBox->addItem(QStringLiteral("%1 · %2px").arg(m.name.toUpper()).arg(m.inputSize),
+                            m.name);
+    m_modelBox->setEnabled(true);
+}
+
 void PipelinePage::onAlgorithms(const QStringList& algos)
 {
     auto* host = findChild<QWidget*>(QStringLiteral("pipeAlgoHost"));
@@ -357,6 +381,8 @@ void PipelinePage::onDeploy()
     spec.algosCsv   = active.join(',');
     spec.screenSink = m_sinkScreen->isChecked();
     spec.name       = QStringLiteral("pipeline-editor");
+    if (m_modelBox->isEnabled())
+        spec.detectorModel = m_modelBox->currentData().toString();
     m_sessionId = m_service->deploy(spec);
     m_deployBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("DEPLOYING…"));

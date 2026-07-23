@@ -156,3 +156,7 @@ concept_A/MediaFusionGCV/build/Makefile
 
 /concept_A/GuiMediaFusion/build/
 /concept_A/x64_debug/
+
+# Detector weights: fetched by scripts/fetch-models.sh, never committed
+# (megabytes of binary, separate licences).
+models/

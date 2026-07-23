@@ -10,6 +10,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
+#include <QSlider>
 #include <QVBoxLayout>
 
 namespace {
@@ -47,6 +49,9 @@ DashboardPage::DashboardPage(BackendService* service, SystemMonitor* monitor, QW
 
     connect(m_service, &BackendService::devicesChanged,    this, &DashboardPage::onDevices);
     connect(m_service, &BackendService::algorithmsChanged, this, &DashboardPage::onAlgorithms);
+    connect(m_service, &BackendService::modelsChanged,     this, &DashboardPage::onModels);
+    connect(m_service, &BackendService::inferenceStatsChanged,
+            this, &DashboardPage::onInferenceStats);
     connect(m_service, &BackendService::sessionStarted,    this, &DashboardPage::onSessionStarted);
     connect(m_service, &BackendService::sessionStopped,    this, &DashboardPage::onSessionStopped);
     connect(m_service, &BackendService::sessionFailed,     this, &DashboardPage::onSessionFailed);
@@ -108,11 +113,11 @@ QWidget* DashboardPage::buildCenterColumn()
     blocks->setSpacing(10);
     blocks->addWidget(telemetryBlock(QStringLiteral("FPS_STABILITY"), m_fpsValue, m_fpsBars,
                                      theme::palette().accentDim, card), 1);
-    QLabel* latValue = nullptr;
-    auto* latBlock = telemetryBlock(QStringLiteral("INFERENCE_LATENCY (MS)"), latValue, m_latBars,
+    auto* latBlock = telemetryBlock(QStringLiteral("INFERENCE_LATENCY (MS)"), m_latValue, m_latBars,
                                     QColor(theme::kTertiary), card);
-    latValue->setText(QStringLiteral("OFFLINE"));
-    latBlock->setToolTip(QStringLiteral("PLANNED — AI inference stage not yet integrated (ONNX Runtime)"));
+    m_latValue->setText(QStringLiteral("OFFLINE"));
+    latBlock->setToolTip(QStringLiteral("Time for one detector forward pass. Inference runs off the "
+                                        "streaming thread, so this is independent of FPS."));
     blocks->addWidget(latBlock, 1);
     blocks->addWidget(telemetryBlock(QStringLiteral("GPU_UTILIZATION"), m_gpuValue, m_gpuBars,
                                      theme::palette().accentDim, card), 1);
@@ -172,19 +177,40 @@ QWidget* DashboardPage::buildConfigPanel()
 
     outer->addWidget(vos::makeHSeparator(panel));
 
-    // ── AI_INFERENCE (placeholder, adapted to the AMD/ONNX plan) ──
+    // ── AI_INFERENCE (real: OpenCV DNN detector in the processing chain) ──
     auto* aiHead = new QHBoxLayout;
     aiHead->addWidget(new vos::SectionHeader(QStringLiteral("AI_INFERENCE"), panel));
-    aiHead->addWidget(new vos::Badge(QStringLiteral("PLANNED"), vos::Badge::Planned, panel));
+    m_aiBadge = new vos::Badge(QStringLiteral("OFFLINE"), vos::Badge::Planned, panel);
+    aiHead->addWidget(m_aiBadge);
     aiHead->addStretch(1);
     outer->addLayout(aiHead);
 
     outer->addWidget(vos::capsLabel(QStringLiteral("DETECTION MODEL"), 8, panel));
-    auto* modelBox = new QComboBox(panel);
-    modelBox->addItems({ QStringLiteral("YOLOv8_NANO (ONNX)"), QStringLiteral("SSD_MOBILENET_V3"),
-                         QStringLiteral("POSE_NET_INDUSTRIAL") });
-    vos::markPlanned(modelBox, QStringLiteral("PLANNED — ONNX Runtime stage not yet in backend"));
-    outer->addWidget(modelBox);
+    m_modelBox = new QComboBox(panel);
+    m_modelBox->addItem(QStringLiteral("QUERYING…"));
+    m_modelBox->setEnabled(false);
+    m_modelBox->setToolTip(QStringLiteral("Models found in models/ — see scripts/fetch-models.sh.\n"
+                                          "Enable the DETECT stage in the processing chain to run one."));
+    connect(m_modelBox, &QComboBox::currentIndexChanged,
+            this, &DashboardPage::onDetectorSettingChanged);
+    outer->addWidget(m_modelBox);
+
+    auto* confRow = new QHBoxLayout;
+    confRow->addWidget(vos::capsLabel(QStringLiteral("CONFIDENCE"), 8, panel));
+    confRow->addStretch(1);
+    m_confLabel = vos::dataLabel(QStringLiteral("0.25"), 10, panel);
+    confRow->addWidget(m_confLabel);
+    outer->addLayout(confRow);
+
+    m_confSlider = new QSlider(Qt::Horizontal, panel);
+    m_confSlider->setRange(5, 95);            // 0.05 … 0.95
+    m_confSlider->setValue(25);
+    connect(m_confSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_confLabel->setText(QString::number(v / 100.0, 'f', 2));
+    });
+    // Only push on release: dragging would otherwise fire a control command per pixel.
+    connect(m_confSlider, &QSlider::sliderReleased, this, &DashboardPage::onDetectorSettingChanged);
+    outer->addWidget(m_confSlider);
 
     auto* accelCard = vos::makeCard("raised", panel);
     auto* accelLay = new QHBoxLayout(accelCard);
@@ -204,19 +230,22 @@ QWidget* DashboardPage::buildConfigPanel()
 
     outer->addWidget(vos::makeHSeparator(panel));
 
-    // ── DETECTION_SUMMARY (placeholder) ──
+    // ── DETECTION_SUMMARY (real, fed by the 1 Hz stats poll) ──
     auto* sumHead = new QHBoxLayout;
     sumHead->addWidget(new vos::SectionHeader(QStringLiteral("DETECTION_SUMMARY"), panel));
-    sumHead->addWidget(new vos::Badge(QStringLiteral("OFFLINE"), vos::Badge::Planned, panel));
+    m_sumBadge = new vos::Badge(QStringLiteral("OFFLINE"), vos::Badge::Planned, panel);
+    sumHead->addWidget(m_sumBadge);
     sumHead->addStretch(1);
     outer->addLayout(sumHead);
 
     auto* tiles = new QHBoxLayout;
     tiles->setSpacing(8);
-    tiles->addWidget(new vos::StatTile(QStringLiteral("TOTAL_OBJECTS"), QStringLiteral("0"),
-                                       theme::palette().accent, panel));
-    tiles->addWidget(new vos::StatTile(QStringLiteral("AVG_CONFIDENCE"), QStringLiteral("—"),
-                                       QColor(theme::kSecondaryLight), panel));
+    m_objectsTile = new vos::StatTile(QStringLiteral("TOTAL_OBJECTS"), QStringLiteral("0"),
+                                      theme::palette().accent, panel);
+    m_confTile    = new vos::StatTile(QStringLiteral("AVG_CONFIDENCE"), QStringLiteral("—"),
+                                      QColor(theme::kSecondaryLight), panel);
+    tiles->addWidget(m_objectsTile);
+    tiles->addWidget(m_confTile);
     outer->addLayout(tiles);
 
     // ── RECENT EVENTS (real feed) ──
@@ -301,6 +330,76 @@ void DashboardPage::onAlgorithms(const QStringList& algos)
     }
 }
 
+void DashboardPage::onModels(const QVector<DetectorModel>& models)
+{
+    const QString previous = m_modelBox->currentData().toString();
+    QSignalBlocker block(m_modelBox);          // repopulating must not fire a reconfigure
+    m_modelBox->clear();
+
+    if (models.isEmpty()) {
+        m_modelBox->addItem(QStringLiteral("NO_MODEL_INSTALLED"));
+        m_modelBox->setEnabled(false);
+        m_aiBadge->setToolTip(QStringLiteral("No weights in models/ — run scripts/fetch-models.sh"));
+        return;
+    }
+
+    for (const DetectorModel& m : models) {
+        const QString label = m.classCount > 0
+                            ? QStringLiteral("%1 (%2 classes)").arg(m.name.toUpper()).arg(m.classCount)
+                            : m.name.toUpper();
+        m_modelBox->addItem(label, m.name);
+    }
+    m_modelBox->setEnabled(true);
+
+    const int restored = m_modelBox->findData(previous);
+    if (restored >= 0)
+        m_modelBox->setCurrentIndex(restored);
+}
+
+void DashboardPage::onDetectorSettingChanged()
+{
+    // Only meaningful while a session is live; otherwise the values are picked
+    // up by the next deploy.
+    if (m_sessionId < 0 || !m_modelBox->isEnabled())
+        return;
+    m_service->setDetector(m_sessionId, m_modelBox->currentData().toString(),
+                           m_confSlider->value() / 100.0, 0.45, true);
+}
+
+void DashboardPage::onInferenceStats(int sessionId, const InferenceSnapshot& s)
+{
+    if (sessionId != m_sessionId)
+        return;
+
+    if (!s.error.isEmpty()) {
+        m_aiBadge->setText(QStringLiteral("ERROR"));
+        m_aiBadge->setKind(vos::Badge::Error);
+        m_aiBadge->setToolTip(s.error);
+        return;
+    }
+    if (!s.active()) {
+        m_aiBadge->setText(s.loaded ? QStringLiteral("LOADED") : QStringLiteral("OFFLINE"));
+        m_aiBadge->setKind(s.loaded ? vos::Badge::Secondary : vos::Badge::Planned);
+        m_aiBadge->setToolTip(s.loaded
+            ? QStringLiteral("Model resident; enable DETECT in the processing chain to run it")
+            : QStringLiteral("No detector in this pipeline's chain"));
+        return;
+    }
+
+    m_aiBadge->setText(QStringLiteral("ACTIVE"));
+    m_aiBadge->setKind(vos::Badge::Ok);
+    m_aiBadge->setToolTip(QStringLiteral("%1 · %2 inferences, %3 frames drawn from a previous result")
+                              .arg(s.modelName).arg(s.framesInferred).arg(s.framesSkipped));
+    m_latValue->setText(QString::number(s.avgInferenceMs, 'f', 1));
+    m_latBars->push(s.avgInferenceMs);
+
+    m_sumBadge->setText(QStringLiteral("LIVE"));
+    m_sumBadge->setKind(vos::Badge::Ok);
+    m_objectsTile->setValue(QString::number(s.objectCount));
+    m_confTile->setValue(s.objectCount > 0 ? QString::number(s.avgConfidence, 'f', 2)
+                                           : QStringLiteral("—"));
+}
+
 QString DashboardPage::algosCsv() const
 {
     QStringList active;
@@ -319,6 +418,10 @@ void DashboardPage::onStart()
     spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
     spec.algosCsv    = algosCsv();
     spec.name        = QStringLiteral("dashboard");
+    if (m_modelBox->isEnabled()) {
+        spec.detectorModel = m_modelBox->currentData().toString();
+        spec.confidence    = m_confSlider->value() / 100.0;
+    }
     m_sessionId = m_service->deploy(spec);
     m_startBtn->setEnabled(false);
 }
@@ -353,6 +456,16 @@ void DashboardPage::onSessionStopped(int sessionId)
     m_tile->unbind();
     m_startBtn->setEnabled(m_deviceBox->count() > 0 && m_deviceBox->currentData().isValid());
     m_stopBtn->setEnabled(false);
+
+    // The inference stage went away with the pipeline — stop showing its last
+    // numbers as if they were live.
+    m_aiBadge->setText(QStringLiteral("OFFLINE"));
+    m_aiBadge->setKind(vos::Badge::Planned);
+    m_sumBadge->setText(QStringLiteral("OFFLINE"));
+    m_sumBadge->setKind(vos::Badge::Planned);
+    m_latValue->setText(QStringLiteral("OFFLINE"));
+    m_objectsTile->setValue(QStringLiteral("0"));
+    m_confTile->setValue(QStringLiteral("—"));
 }
 
 void DashboardPage::onSessionFailed(int sessionId, const QString& error)

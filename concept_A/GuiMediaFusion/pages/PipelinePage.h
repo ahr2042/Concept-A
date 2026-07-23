@@ -29,6 +29,7 @@ public:
 private slots:
     void onDevices(const QVector<DeviceInfo>& devices);
     void onAlgorithms(const QStringList& algos);
+    void onModels(const QVector<DetectorModel>& models);
     void onDeploy();
     void onHalt();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
@@ -46,6 +47,7 @@ private:
     QStackedWidget* m_propsStack = nullptr;
     QComboBox*      m_deviceBox  = nullptr;
     QComboBox*      m_capsBox    = nullptr;
+    QComboBox*      m_modelBox   = nullptr;
     QList<QCheckBox*> m_algoBoxes;
     QRadioButton*   m_sinkApp    = nullptr;
     QRadioButton*   m_sinkScreen = nullptr;

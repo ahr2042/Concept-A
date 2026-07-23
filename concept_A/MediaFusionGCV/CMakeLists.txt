@@ -10,7 +10,19 @@ pkg_search_module(gstreamer       REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.4)
 pkg_search_module(gstreamer-app   REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.4)
 pkg_search_module(gstreamer-video REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=1.4)
 pkg_check_modules(gstreamer-check REQUIRED IMPORTED_TARGET gstreamer-check-1.0)
-pkg_check_modules(opencv          REQUIRED IMPORTED_TARGET opencv4)
+
+# The detector needs OpenCV 4.8+: the 4.6 that Ubuntu 24.04 ships cannot import
+# current YOLO ONNX exports (FP16 initializers, then an unsupported Split node).
+# scripts/build-opencv.sh installs a suitable build into a user-writable prefix;
+# look there first so no configure-time flags are needed.
+foreach(_cvPrefix "$ENV{HOME}/.local" "/opt/opencv")
+    if(EXISTS "${_cvPrefix}/lib/pkgconfig/opencv4.pc")
+        set(ENV{PKG_CONFIG_PATH} "${_cvPrefix}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+    endif()
+endforeach()
+
+pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4>=4.8)
+message(STATUS "OpenCV ${opencv_VERSION} (${opencv_PREFIX})")
 
 # ── Shared library (everything except main.cpp) ───────────────────────────────
 set(LIB_SOURCES
@@ -23,6 +35,8 @@ set(LIB_SOURCES
     MediaFusionGCV_API.cpp
     FrameProcessor.cpp
     Algorithms.cpp
+    Detector.cpp
+    ModelRegistry.cpp
 )
 
 add_library(MediaFusionGCV_Lib STATIC ${LIB_SOURCES})
@@ -52,6 +66,7 @@ add_executable(MediaFusionGCV_Tests
     tests/test_api_null_safety.cpp
     tests/test_pipeline_lifecycle.cpp
     tests/test_device_enumeration.cpp
+    tests/test_inference.cpp
 )
 
 target_include_directories(MediaFusionGCV_Tests PRIVATE

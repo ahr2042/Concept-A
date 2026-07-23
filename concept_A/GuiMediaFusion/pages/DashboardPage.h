@@ -2,11 +2,11 @@
 
 // Dashboard — design screen "VISION_OS / Dashboard".
 // Center: live viewport (VideoTile) + SYSTEM_TELEMETRY strip (real fps &
-// throughput from the receiver probe, real GPU utilization from sysfs;
-// inference latency is a labelled placeholder). Right: PIPELINE_CONFIGURATION
-// (real device/caps/processing selection + start/stop), an AI_INFERENCE
-// placeholder section, DETECTION_SUMMARY placeholders, live event feed, and the
-// REBOOT_CORE / TERMINATE_PID daemon controls.
+// throughput from the receiver probe, real GPU utilization from sysfs, real
+// inference latency from the detector). Right: PIPELINE_CONFIGURATION (real
+// device/caps/processing selection + start/stop), AI_INFERENCE (real model
+// picker and confidence, applied live), DETECTION_SUMMARY fed by the daemon's
+// stats poll, live event feed, and the REBOOT_CORE / TERMINATE_PID controls.
 
 #include "../core/AppLog.h"
 #include "../core/BackendService.h"
@@ -18,6 +18,7 @@ class QComboBox;
 class QCheckBox;
 class QLabel;
 class QPushButton;
+class QSlider;
 class QVBoxLayout;
 class VideoTile;
 
@@ -41,6 +42,9 @@ signals:
 private slots:
     void onDevices(const QVector<DeviceInfo>& devices);
     void onAlgorithms(const QStringList& algos);
+    void onModels(const QVector<DetectorModel>& models);
+    void onInferenceStats(int sessionId, const InferenceSnapshot& snapshot);
+    void onDetectorSettingChanged();     // model / confidence moved by the operator
     void onStart();
     void onStop();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
@@ -67,6 +71,15 @@ private:
     QPushButton* m_stopBtn   = nullptr;
     QLabel*      m_hwLabel   = nullptr;
 
+    // AI_INFERENCE / DETECTION_SUMMARY
+    QComboBox*      m_modelBox   = nullptr;
+    QSlider*        m_confSlider = nullptr;
+    QLabel*         m_confLabel  = nullptr;
+    vos::Badge*     m_aiBadge    = nullptr;
+    vos::Badge*     m_sumBadge   = nullptr;
+    vos::StatTile*  m_objectsTile = nullptr;
+    vos::StatTile*  m_confTile    = nullptr;
+
     // telemetry strip
     vos::KeyValueRow* m_throughput = nullptr;
     vos::KeyValueRow* m_frameDrop  = nullptr;
@@ -75,6 +88,7 @@ private:
     vos::MiniBars*    m_gpuBars    = nullptr;
     QLabel*           m_fpsValue   = nullptr;
     QLabel*           m_gpuValue   = nullptr;
+    QLabel*           m_latValue   = nullptr;
 
     // event feed
     QVBoxLayout* m_feedLay = nullptr;

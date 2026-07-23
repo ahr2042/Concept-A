@@ -55,7 +55,9 @@ interrupts operations; errors surface as log entries and tile badges.
 | Area | What works |
 |---|---|
 | **Streaming** | Camera → viewport, end-to-end: `create → set-device → algos → start`, frames over a per-stream zero-copy unixfd socket into an embedded GL viewport |
-| **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`) applied in place via a pad probe — toggled live from the console |
+| **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`, `detect`) applied in place via a pad probe — toggled live from the console |
+| **AI inference** | YOLO-family ONNX object detection (`detect`) through OpenCV DNN: model picker and confidence slider in the console, boxes drawn into the frame, model swappable mid-stream. Inference runs on a worker thread and the probe overlays the newest result, so detection cost never throttles the stream |
+| **Inference telemetry** | Real per-pipeline detector stats over the control protocol (`stats <id>`) — latency chart, TOTAL_OBJECTS / AVG_CONFIDENCE tiles, and detections in the event log |
 | **Daemon control** | `MediaFusionGCV --serve <socket>`: full text protocol (create / devices / set-device / algos / start / stop / delete / list), one connection, serialized commands |
 | **Daemon lifecycle** | Console auto-spawns the daemon if unreachable, restarts it (`REBOOT_CORE`) or shuts it down (`TERMINATE_PID`); crash → status LED + tiles fall back to `NO_SIGNAL` |
 | **Device manager** | Camera enumeration (raw V4L2 and PipeWire providers, same-node twins deduplicated) with per-device caps (resolution / format / framerate) selection; the source element is built from the selected device; only modes the CPU pipeline can negotiate are listed (DMABuf/`DMA_DRM` import is planned) |
@@ -63,17 +65,17 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Telemetry** | Real per-stream FPS & throughput (sink pad probe); real host telemetry — AMD GPU temperature, VRAM, fan, GPU busy %, CPU package temp (hwmon, 1 Hz) |
 | **Observability** | App-wide event log with level filters and CSV export, including the full control-protocol transcript |
 | **Theming** | Generated QSS from design tokens; runtime accent-hue switching |
-| **Verification** | `gstreamer-check` suite (3 suites, 14 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
+| **Verification** | `gstreamer-check` suite (4 suites, 22 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
 
 ### Planned
 
 | Area | What's coming | Depends on |
 |---|---|---|
-| **AI inference** | ONNX Runtime / ncnn detection stage as another `Algorithm` in the chain — model picker, confidence threshold, overlay boxes (AMD-friendly; no CUDA required) | engine |
 | **RAW vs AI compare** | Side-by-side comparison of the raw and processed branches of one source | engine `tee` support |
 | **More sources** | RTSP, GigE Vision, file and test sources (protocol chips already in the rail) | engine |
 | **Recording** | REC / REC ALL, freeze-frame, DVR scrubbing | engine |
-| **Deeper telemetry** | Inference latency chart, frame-integrity accounting, memory bandwidth | AI stage |
+| **GPU inference** | Detector on the GPU. CPU-only today: this rig is AMD, so no CUDA, and OpenCV's OpenCL target needs an ICD that is not guaranteed present | ONNX Runtime or ncnn Vulkan |
+| **Deeper telemetry** | Frame-integrity accounting, memory bandwidth | engine |
 | **Pipeline editor** | Free node dragging & arbitrary graphs (today: fixed linear SOURCE → PROCESS → SINK, matching the engine) | engine |
 | **Remote operation** | INET sockets for console and engine on different hosts | — |
 | **Settings** | Network, storage and API-access panels | their features |
@@ -123,8 +125,17 @@ transport the per-frame IPC cost is a few bytes of ancillary data.
 **Key engine invariant** — the OpenCV stage is an **in-place pad probe** on a BGR
 `capsfilter`, *not* an appsink→appsrc bridge: hand-allocated buffers would break
 `unixfdsink`'s memfd allocation negotiation downstream. New algorithms implement the
-small `Algorithm` interface and register in the factory; an ONNX detector slots in as
-just another chain entry.
+small `Algorithm` interface and register in the factory; the ONNX detector is just
+another chain entry.
+
+**Why inference is asynchronous** — a yolov5n forward pass costs ~55 ms on this CPU,
+far longer than a frame interval. Running it inside the probe would turn every
+detection into pipeline backpressure, so `DetectorAlgorithm` hands a frame copy to a
+worker thread when that worker is idle and overlays the newest completed result.
+The stream keeps the camera's frame rate, boxes lag a frame or two, and `stats`
+reports inference latency and the number of frames drawn from a previous result
+separately — which is why FPS and INFERENCE_LATENCY are independent readings in the
+console.
 
 **Threading rules (console)** — sockets live on a worker thread, GStreamer buses are
 timer-polled (no GLib main loop), widgets are touched only on the GUI thread.
@@ -140,8 +151,12 @@ interactively: run the engine without arguments for a REPL, or
 | `create <src> <snk> <name>` | `OK id=N` | Allocate a pipeline (e.g. `create camera app cam0`) |
 | `devices <id>` | device & caps listing | Enumerate V4L2 devices with all capture modes |
 | `set-device <id> <dev> <cap>` | `OK` | Bind a device + capture mode to the source |
-| `algos-list` | `OK grayscale,canny` | Available processing algorithms |
+| `algos-list` | `OK grayscale,canny,detect` | Available processing algorithms |
 | `algos <id> <csv>` | `OK` | Set the processing chain (empty CSV disables) |
+| `models` | model listing | Detector models installed in `models/` |
+| `model <id> [name]` | `OK <name>` | Load a detector model (no name unloads it) |
+| `detect-params <id> <conf> <nms> [draw]` | `OK` | Detector thresholds and box overlay |
+| `stats <id>` | stats + detections | Inference latency and the last result |
 | `start <id>` | `OK <video-socket-path>` | Start streaming; reply carries the data-plane socket |
 | `stop <id>` | `OK` | Stop streaming |
 | `delete <id>` | `OK remaining=N` | Destroy a pipeline (**ids shift down** — clients re-map) |
@@ -160,7 +175,22 @@ sudo apt install build-essential cmake pkg-config \
      qt6-base-dev \
      libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
      gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-gl \
-     libopencv-dev
+     libjpeg-dev libpng-dev zlib1g-dev
+```
+
+**OpenCV 4.8+** is required and Ubuntu 24.04 ships 4.6, whose ONNX importer cannot
+read current YOLO exports (FP16 initializers, then an unsupported `Split` node in
+the detect head). Build one — no root needed, it installs into `~/.local` and the
+engine's CMake looks there first:
+
+```bash
+scripts/build-opencv.sh            # ~10 min; only the engine links OpenCV
+```
+
+Then fetch the detector weights (kept out of git):
+
+```bash
+scripts/fetch-models.sh            # yolov5n.onnx + COCO labels → models/
 ```
 
 ### Build
@@ -215,7 +245,9 @@ concept_A/
 ├── MediaFusionGCV/          # engine: library, daemon/REPL executable, tests
 │   ├── PipelineManager.*    #   pipeline lifecycle, GMainLoop thread
 │   ├── FrameProcessor.*     #   in-place OpenCV chain (pad probe)
-│   ├── Algorithms.*         #   Algorithm interface + factory (grayscale, canny)
+│   ├── Algorithms.*         #   Algorithm interface + factory (grayscale, canny, detect)
+│   ├── Detector.*           #   ONNX object detection on a worker thread
+│   ├── ModelRegistry.*      #   discovery of models/ weights + labels
 │   ├── GStreamerSink*.??    #   screen (autovideosink) & app (unixfdsink) sinks
 │   ├── MediaFusionGCV_API.* #   flat extern-C API over the pipeline stash
 │   └── tests/               #   gstreamer-check suites
@@ -226,6 +258,10 @@ concept_A/
 │   ├── theme/               #   design tokens → generated QSS
 │   └── StreamReceiver.*     #   unixfdsrc → glimagesink + stats probe
 └── x64_debug/               # build output
+models/                      # detector weights (gitignored, see scripts/)
+scripts/
+├── build-opencv.sh          # OpenCV 4.8+ into ~/.local (apt's 4.6 is too old)
+└── fetch-models.sh          # yolov5n.onnx + COCO labels
 docs/
 ├── GUI_DESIGN.md            # console software design & design→engine feature matrix
 ├── stitch/                  # browsable HTML design mockups (Stitch)
@@ -234,15 +270,14 @@ docs/
 
 ## Roadmap
 
-1. **ONNX Runtime inference stage** — detector as an `Algorithm`, model picker and
-   confidence wiring already present in the console (targets AMD via ONNX Runtime /
-   ncnn Vulkan; the dev rig is an RX 6700 XT, so no CUDA path).
-2. **Engine `tee` support** — raw + processed branches from one source, unlocking the
+1. **Engine `tee` support** — raw + processed branches from one source, unlocking the
    Compare page and per-tile RAW/processed modes.
-3. **Inference telemetry** — latency chart, frame-integrity and aggregate score on
-   the Analytics page.
-4. **RTSP source** — first non-V4L2 protocol chip.
-5. **Recording** — REC / REC ALL to disk with the DVR transport bar.
+2. **GPU inference** — the detector is CPU-only today (~55 ms/frame for yolov5n at
+   640² on this rig). ONNX Runtime or ncnn Vulkan would give the AMD RX 6700 XT a
+   path; there is no CUDA option here.
+3. **RTSP source** — first non-V4L2 protocol chip.
+4. **Recording** — REC / REC ALL to disk with the DVR transport bar.
+5. **Frame-integrity accounting** — drop counters and aggregate score on Analytics.
 
 ## License
 

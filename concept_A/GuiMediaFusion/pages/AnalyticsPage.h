@@ -16,7 +16,7 @@
 class QLabel;
 class BackendService;
 
-namespace vos { class LineChart; class StatTile; class KeyValueRow; }
+namespace vos { class LineChart; class StatTile; class KeyValueRow; class Badge; }
 
 class AnalyticsPage : public QWidget
 {
@@ -42,6 +42,8 @@ private:
     SystemMonitor*  m_monitor;
 
     vos::LineChart* m_fpsChart  = nullptr;
+    vos::LineChart* m_infChart  = nullptr;
+    vos::Badge*     m_infBadge  = nullptr;
     vos::StatTile*  m_gpuTemp   = nullptr;
     vos::StatTile*  m_cpuTemp   = nullptr;
     vos::StatTile*  m_vramTemp  = nullptr;

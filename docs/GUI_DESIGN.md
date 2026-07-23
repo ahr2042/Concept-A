@@ -52,6 +52,10 @@ core/
                          fresh pipeline per session, ids re-based after erase)
   DeviceParser           parses the daemon's `devices` listing into
                          DeviceInfo{name, caps[{index,label,raw}]}
+  InferenceTypes         parses `models` and `stats <id>` into DetectorModel /
+                         InferenceSnapshot; BackendService polls stats at 1 Hz
+                         (quietly — the wire log would drown otherwise) and
+                         fans the result out to Dashboard and Analytics
   SystemMonitor          1 Hz sampler of real host telemetry: amdgpu hwmon
                          (edge temp, fan, VRAM, gpu_busy_percent), coretemp
 theme/Theme              design tokens from the Stitch DESIGN.md (colors,
@@ -83,24 +87,28 @@ Old `GuiMediaFusion{,Model,Controller}`, `PreLaunchSettings.ui`, `guiElements.h`
 | START/STOP stream, REBOOT_CORE, TERMINATE_PID | **REAL** | deploy/stop session; daemon restart/shutdown |
 | Device list & caps selection (Device Manager) | **REAL** | `devices` → DeviceParser; CONNECT = `set-device` |
 | Protocol filter chips USB / RTSP / GigE / CoaXPress | PARTIAL | USB (V4L2) real; others disabled `PLANNED` |
-| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → grayscale/canny checkboxes → `algos` |
+| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → grayscale/canny/detect checkboxes → `algos` |
 | Pipeline editor canvas SOURCE→PROCESS→SINK | PARTIAL | fixed linear chain (matches backend); node drag `PLANNED` |
 | DEPLOY PIPELINE | **REAL** | create → set-device → algos → start |
 | Multi-grid 2×2 tiles, per-tile source | **REAL**¹ | one session per tile (¹ limited by #cameras) |
 | GLOBAL SYNC / MASTER CLOCK / REC ALL / FREEZE | PLANNED | disabled chrome |
 | FPS / THROUGHPUT telemetry | **REAL** | StreamReceiver pad-probe (frames & bytes / s) |
 | GPU_UTILIZATION, thermal tiles, fan (Analytics) | **REAL** | SystemMonitor (amdgpu + coretemp hwmon) |
-| Inference latency chart, FRAME_INTEGRITY, MEM BW | PLANNED | placeholder charts, honest zeros + badges |
-| Detection model combo, confidence slider, boxes | PLANNED | disabled; AI stage not in backend yet (ONNX/AMD path) |
-| GPU_ACCELERATION "NVIDIA/CUDA/TensorRT" labels | ADAPTED | this rig is AMD → labels read ONNX-RUNTIME / `PLANNED`² |
-| Detection summary + detections log | PLANNED | empty-state "AI_STAGE_OFFLINE" |
+| Inference latency chart | **REAL** | `stats <id>` @ 1 Hz → Analytics chart + Dashboard block |
+| FRAME_INTEGRITY, MEM BW | PLANNED | placeholder charts, honest zeros + badges |
+| Detection model combo, confidence slider, boxes | **REAL** | `models` → combo; `model`/`detect-params`; boxes drawn in-frame by the engine |
+| GPU_ACCELERATION "NVIDIA/CUDA/TensorRT" labels | ADAPTED | this rig is AMD and inference is CPU-only → `PLANNED`² |
+| Detection summary + detections log | **REAL** | TOTAL_OBJECTS / AVG_CONFIDENCE from `stats`; label changes go to AppLog |
 | Stream Comparison RAW vs AI | PLANNED | needs backend tee; page ships as chrome + note |
 | System event log w/ filter + CSV export (Logs) | **REAL** | AppLog (includes raw control-protocol transcript) |
 | Settings: accent hue, log verbosity, overlays | **REAL** | Theme regeneration; AppLog threshold; QSettings |
 | Settings: connection (socket path, autostart) | **REAL** | BackendService config |
 | Settings: NETWORK / STORAGE / API ACCESS tabs | PLANNED | empty-state panels |
 
-² per the project's AI plan: OpenCV + ONNX Runtime / ncnn on AMD (no CUDA).
+² the detector runs on the CPU through OpenCV DNN. There is no CUDA on this rig
+and OpenCV's OpenCL target needs an ICD that is not guaranteed present, so the
+acceleration toggle stays disabled until an ONNX Runtime / ncnn Vulkan backend
+lands. `DetectorAlgorithm::runInference()` is the seam that would change.
 
 ## 4. Control-protocol session policy
 

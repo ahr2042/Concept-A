@@ -34,14 +34,53 @@ FrameProcessor::~FrameProcessor()
 
 void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 {
+    DetectorConfig cfg = detectorConfig();
+
     std::vector<std::unique_ptr<Algorithm>> built;
     built.reserve(names.size());
-    for (const auto& n : names)
-        if (auto a = makeAlgorithm(n))
-            built.push_back(std::move(a));
+    for (const auto& n : names) {
+        auto a = makeAlgorithm(n);
+        if (!a)
+            continue;
+        // A detector joining the chain inherits the model chosen earlier;
+        // loading happens here, off the streaming thread.
+        if (auto* det = dynamic_cast<DetectorAlgorithm*>(a.get()))
+            det->configure(cfg);
+        built.push_back(std::move(a));
+    }
 
     std::lock_guard<std::mutex> lk(m_mutex);
     m_algos = std::move(built);
+}
+
+bool FrameProcessor::setDetectorConfig(const DetectorConfig& cfg)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    m_detectorConfig = cfg;
+
+    // Loading a graph takes a moment and the streaming thread waits on this
+    // mutex meanwhile — a model swap costs a frame or two, which is the
+    // expected behaviour for changing models mid-stream.
+    bool ok = true;
+    for (const auto& a : m_algos)
+        if (auto* det = dynamic_cast<DetectorAlgorithm*>(a.get()))
+            ok = det->configure(cfg) && ok;
+    return ok;
+}
+
+DetectorConfig FrameProcessor::detectorConfig() const
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    return m_detectorConfig;
+}
+
+bool FrameProcessor::inferenceStats(InferenceStats& out) const
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    for (const auto& a : m_algos)
+        if (a->snapshotStats(out))
+            return true;
+    return false;
 }
 
 std::vector<std::string> FrameProcessor::activeAlgorithms() const

@@ -1,6 +1,7 @@
 #include "MediaFusionGCV_API.h"
 #include "PipelineManager.h"
 #include "Algorithms.h"
+#include "ModelRegistry.h"
 
 #include <sstream>
 #include <string>
@@ -154,5 +155,42 @@ const char* mediaLib_availableAlgorithms()
 		csv += n;
 	}
 	return csv.c_str();
+}
+
+errorState mediaLib_setDetectorModel(size_t pipelineId, const char* modelNameOrPath)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+	return pipelines[pipelineId]->setDetectorModel(modelNameOrPath ? modelNameOrPath : "");
+}
+
+errorState mediaLib_setDetectorParams(size_t pipelineId, float confidence, float nms, bool drawBoxes)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+	return pipelines[pipelineId]->setDetectorParams(confidence, nms, drawBoxes);
+}
+
+const char* mediaLib_availableModels()
+{
+	static thread_local std::string listing;
+	listing.clear();
+	for (const auto& m : availableModels()) {
+		listing += "name=" + m.name;
+		listing += " classes=" + std::to_string(m.classCount);
+		listing += " input="   + std::to_string(m.inputSize);
+		listing += " path="    + m.path;
+		listing += "\n";
+	}
+	return listing.c_str();
+}
+
+errorState mediaLib_getInferenceStats(size_t pipelineId, InferenceStats& stats)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+	if (!pipelines[pipelineId]->inferenceStats(stats))
+		return errorState::NOT_IMPLEMENTED_YET_ERR;
+	return errorState::NO_ERR;
 }
 

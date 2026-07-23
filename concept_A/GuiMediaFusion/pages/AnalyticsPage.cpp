@@ -36,14 +36,25 @@ AnalyticsPage::AnalyticsPage(BackendService* service, SystemMonitor* monitor, QW
     chartLay->setSpacing(8);
     auto* chartHead = new QHBoxLayout;
     chartHead->addWidget(new vos::SectionHeader(QStringLiteral("RECEIVE_RATE (FPS)"), chartCard));
-    auto* infNote = new vos::Badge(QStringLiteral("INFERENCE_LATENCY: PLANNED"), vos::Badge::Planned, chartCard);
-    infNote->setToolTip(QStringLiteral("The design's inference-latency chart activates with the ONNX stage"));
     chartHead->addStretch(1);
-    chartHead->addWidget(infNote);
     chartLay->addLayout(chartHead);
     m_fpsChart = new vos::LineChart(120, chartCard);
     m_fpsChart->setUnit(QStringLiteral(" fps"));
     chartLay->addWidget(m_fpsChart, 1);
+
+    // The design's second chart: detector latency. Sampled at 1 Hz from the
+    // daemon's stats, and deliberately separate from the FPS trace above —
+    // inference runs off the streaming thread, so the two move independently.
+    auto* infHead = new QHBoxLayout;
+    infHead->addWidget(new vos::SectionHeader(QStringLiteral("INFERENCE_LATENCY (MS)"), chartCard));
+    infHead->addStretch(1);
+    m_infBadge = new vos::Badge(QStringLiteral("OFFLINE"), vos::Badge::Planned, chartCard);
+    m_infBadge->setToolTip(QStringLiteral("Populates while a pipeline runs the DETECT stage"));
+    infHead->addWidget(m_infBadge);
+    chartLay->addLayout(infHead);
+    m_infChart = new vos::LineChart(120, chartCard);
+    m_infChart->setUnit(QStringLiteral(" ms"));
+    chartLay->addWidget(m_infChart, 1);
     row1->addWidget(chartCard, 2);
 
     auto* integCard = vos::makeCard("true", this);
@@ -126,6 +137,20 @@ AnalyticsPage::AnalyticsPage(BackendService* service, SystemMonitor* monitor, QW
 
     connect(m_monitor, &SystemMonitor::sampled, this, &AnalyticsPage::onSample);
     connect(&AppLog::instance(), &AppLog::entryAdded, this, &AnalyticsPage::onLogEntry);
+    connect(m_service, &BackendService::inferenceStatsChanged, this,
+            [this](int, const InferenceSnapshot& s) {
+        // Any session's detector feeds this page — the console runs one
+        // inference stage at a time in practice, and the chart is a
+        // whole-system view rather than a per-tile one.
+        if (!s.active()) {
+            m_infBadge->setText(QStringLiteral("OFFLINE"));
+            m_infBadge->setKind(vos::Badge::Planned);
+            return;
+        }
+        m_infBadge->setText(s.modelName.toUpper());
+        m_infBadge->setKind(vos::Badge::Ok);
+        m_infChart->push(s.avgInferenceMs);
+    });
     startTimer(1000);
 }
 

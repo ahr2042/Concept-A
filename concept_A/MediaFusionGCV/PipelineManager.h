@@ -9,6 +9,7 @@
 #include "SourceType.h"
 #include "SinkType.h"
 #include "errorState.h"
+#include "InferenceStats.h"
 
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
@@ -41,6 +42,16 @@ public:
     // implies enabling. Algorithm names come from availableAlgorithms().
     void       setProcessingEnabled(bool enabled);
     errorState setAlgorithms(const std::vector<std::string>& names);
+
+    // Inference stage — the "detect" algorithm. The model is loaded here and
+    // now (not lazily at start) so a bad name or an unreadable graph is
+    // reported to the caller instead of failing silently mid-stream. An empty
+    // name unloads the model and leaves the stage idle.
+    errorState setDetectorModel(const std::string& modelNameOrPath);
+    errorState setDetectorParams(float confidence, float nms, bool drawBoxes);
+
+    // False when this pipeline has no inference stage in its chain.
+    bool inferenceStats(InferenceStats& out) const;
 
 private:
     GstElement*           pipeline       = nullptr;
