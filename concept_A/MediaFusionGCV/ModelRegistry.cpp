@@ -27,6 +27,16 @@ bool isDirectory(const fs::path& p)
     return !p.empty() && fs::is_directory(p, ec);
 }
 
+// Path to <dir>/<name> if it is a regular file, else "". Used to pick up the
+// ncnn .param/.bin that sit next to a model's .onnx once fetch-models.sh has
+// converted them; absent is normal (CPU-only, no ncnn conversion run).
+std::string siblingFile(const fs::path& dir, const std::string& name)
+{
+    std::error_code ec;
+    fs::path p = dir / name;
+    return fs::is_regular_file(p, ec) ? p.string() : std::string();
+}
+
 // The labels that go with <dir>/<stem>.onnx: a same-named sidecar first, then
 // the shared COCO list the YOLO family uses.
 std::string findLabelsFor(const fs::path& dir, const std::string& stem)
@@ -101,6 +111,8 @@ std::vector<ModelInfo> availableModels()
             info.path       = p.string();
             info.labelsPath = findLabelsFor(p.parent_path(), stem);
             info.classCount = loadLabels(info.labelsPath).size();
+            info.ncnnParam  = siblingFile(p.parent_path(), stem + ".param");
+            info.ncnnBin    = siblingFile(p.parent_path(), stem + ".bin");
             models.push_back(std::move(info));
         }
     }
@@ -128,6 +140,8 @@ bool findModel(const std::string& nameOrPath, ModelInfo& out)
         out.path       = p.string();
         out.labelsPath = findLabelsFor(p.parent_path(), out.name);
         out.classCount = loadLabels(out.labelsPath).size();
+        out.ncnnParam  = siblingFile(p.parent_path(), out.name + ".param");
+        out.ncnnBin    = siblingFile(p.parent_path(), out.name + ".bin");
         return true;
     }
     return false;

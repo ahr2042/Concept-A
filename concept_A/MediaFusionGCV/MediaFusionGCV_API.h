@@ -92,6 +92,17 @@ extern "C" {
 	// NOT_IMPLEMENTED_YET_ERR when the chain has no inference stage.
 	MEDIAFUSIONGCV_API errorState  mediaLib_getInferenceStats(size_t, InferenceStats&);
 
+	// Acceleration backends detected on this host (probed once at init). One line
+	// per backend: "backend=<cpu|vulkan|cuda> available=<0|1> device=<name>".
+	// The GUI renders only the available ones. Pointer valid until the next call.
+	MEDIAFUSIONGCV_API const char* mediaLib_detectAccelerators();
+
+	// Selects a pipeline's acceleration backend: 0=auto, 1=cpu, 2=vulkan, 3=cuda
+	// (AccelSelection). AUTO resolves to the best available; an unavailable pick
+	// falls back to CPU. Shapes the pipeline topology, so it is applied at the
+	// next start — set it before mediaLib_startStreaming.
+	MEDIAFUSIONGCV_API errorState  mediaLib_setAccel(size_t, int32_t selection);
+
 	MEDIAFUSIONGCV_API size_t mediaLib_delete(size_t);
 	MEDIAFUSIONGCV_API void   mediaLib_destroyAll();
 

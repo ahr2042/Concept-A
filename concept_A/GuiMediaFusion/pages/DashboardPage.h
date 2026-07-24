@@ -22,7 +22,7 @@ class QSlider;
 class QVBoxLayout;
 class VideoTile;
 
-namespace vos { class MiniBars; class KeyValueRow; class StatTile; class Badge; }
+namespace vos { class MiniBars; class KeyValueRow; class StatTile; class Badge; class ToggleSwitch; }
 
 class DashboardPage : public QWidget
 {
@@ -56,6 +56,9 @@ private:
     QWidget* buildCenterColumn();
     QWidget* buildConfigPanel();
     QString  algosCsv() const;
+    // Enables/checks the GPU_ACCELERATION toggle from detected backends + the
+    // current selection (disabled + off when no GPU is present).
+    void     refreshAccelToggle();
 
     BackendService* m_service;
     SystemMonitor*  m_monitor;
@@ -70,6 +73,7 @@ private:
     QPushButton* m_startBtn  = nullptr;
     QPushButton* m_stopBtn   = nullptr;
     QLabel*      m_hwLabel   = nullptr;
+    vos::ToggleSwitch* m_accelToggle = nullptr;   // GPU_ACCELERATION on/off
 
     // AI_INFERENCE / DETECTION_SUMMARY
     QComboBox*      m_modelBox   = nullptr;

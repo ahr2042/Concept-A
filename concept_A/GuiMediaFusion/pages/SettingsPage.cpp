@@ -5,6 +5,7 @@
 #include "../theme/Theme.h"
 #include "../widgets/Components.h"
 
+#include <QAbstractButton>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QFileDialog>
@@ -28,6 +29,10 @@ int SettingsPage::savedVerbosity()
 SettingsPage::SettingsPage(BackendService* service, QWidget* parent)
     : QWidget(parent), m_service(service)
 {
+    // Apply the persisted backend selection to the service before any deploy.
+    m_service->setAccelSelection(
+        QSettings().value(QStringLiteral("runtime/accel"), QStringLiteral("auto")).toString());
+
     auto* lay = new QVBoxLayout(this);
     lay->setContentsMargins(20, 16, 20, 16);
     lay->setSpacing(14);
@@ -144,36 +149,38 @@ QWidget* SettingsPage::buildRuntimeTab()
     auto* accelHead = new QHBoxLayout;
     accelHead->addWidget(new vos::SectionHeader(QStringLiteral("INFERENCE ACCELERATION"), accel));
     accelHead->addStretch(1);
-    accelHead->addWidget(new vos::Badge(QStringLiteral("HARDWARE: AMD RADEON (NO CUDA)"),
+    accelHead->addWidget(new vos::Badge(QStringLiteral("AUTO-DETECTED"),
                                         vos::Badge::Accent, accel));
     accelLay->addLayout(accelHead);
 
-    struct Row { const char* title; const char* desc; };
-    const Row rows[] = {
-        { "ONNX Runtime Acceleration",
-          "Planned inference engine for the FrameProcessor stage (CPU EP first, ROCm EP evaluated)." },
-        { "ncnn Vulkan Backend",
-          "Alternative lightweight engine using the Radeon's Vulkan queue." },
-    };
-    for (const Row& r : rows) {
-        auto* rowCard = vos::makeCard("raised", accel);
-        auto* rowLay = new QHBoxLayout(rowCard);
-        rowLay->setContentsMargins(12, 10, 12, 10);
-        auto* text = new QVBoxLayout;
-        text->setSpacing(3);
-        auto* t = new QLabel(QString::fromLatin1(r.title), rowCard);
-        t->setFont(theme::bodyFont(12, QFont::DemiBold));
-        auto* d = new QLabel(QString::fromLatin1(r.desc), rowCard);
-        d->setProperty("vosHint", true);
-        d->setWordWrap(true);
-        text->addWidget(t);
-        text->addWidget(d);
-        rowLay->addLayout(text, 1);
-        auto* toggle = new vos::ToggleSwitch(rowCard);
-        vos::markPlanned(toggle, QStringLiteral("PLANNED — AI stage not yet in the backend"));
-        rowLay->addWidget(toggle);
-        accelLay->addWidget(rowCard);
-    }
+    // Backend selector, built from what the daemon actually detected
+    // (`accelerators`). Only available engines are selectable, plus an
+    // always-present AUTO; with no GPU it collapses to CPU only. Applied on the
+    // next Deploy (the choice shapes the pipeline topology, fixed once PLAYING).
+    m_accelStatus = new QLabel(QStringLiteral("Detecting acceleration…"), accel);
+    m_accelStatus->setProperty("vosHint", true);
+    m_accelStatus->setWordWrap(true);
+    accelLay->addWidget(m_accelStatus);
+
+    m_accelGroup = new QButtonGroup(accel);
+    m_accelGroup->setExclusive(true);
+    auto* accelListHost = new QWidget(accel);
+    m_accelList = new QVBoxLayout(accelListHost);
+    m_accelList->setContentsMargins(0, 0, 0, 0);
+    m_accelList->setSpacing(8);
+    accelLay->addWidget(accelListHost);
+
+    rebuildAccelerators(m_service->accelerators());
+    connect(m_service, &BackendService::acceleratorsChanged,
+            this, &SettingsPage::rebuildAccelerators);
+    // Queued: this rebuild deletes and recreates the radios, and it can be
+    // triggered by a radio's own toggled() handler (radio -> setAccelSelection ->
+    // accelSelectionChanged). Deleting the button mid-signal would be a
+    // use-after-free, so defer the rebuild to the next event-loop turn.
+    connect(m_service, &BackendService::accelSelectionChanged, this,
+            [this](const QString&) { rebuildAccelerators(m_service->accelerators()); },
+            Qt::QueuedConnection);  // sync with Dashboard toggle
+    m_service->refreshAccelerators();
 
     auto* batchCard = vos::makeCard("raised", accel);
     auto* batchLay = new QVBoxLayout(batchCard);
@@ -308,6 +315,61 @@ QWidget* SettingsPage::buildPlannedTab(const QString& what)
     return host;
 }
 
+void SettingsPage::rebuildAccelerators(const QVector<AcceleratorOption>& accels)
+{
+    if (!m_accelList || !m_accelGroup)
+        return;
+
+    // Tear down the previous radios (toggled(false) fires on delete but the
+    // handler ignores it — it only acts on the newly-checked button).
+    const auto old = m_accelGroup->buttons();
+    for (QAbstractButton* b : old) {
+        m_accelGroup->removeButton(b);
+        delete b;
+    }
+
+    const QString current = m_service->accelSelection();
+    bool anyChecked = false;
+
+    auto addRadio = [&](const QString& sel, const QString& text, bool enabled, bool checked) {
+        auto* rb = new QRadioButton(text);
+        rb->setEnabled(enabled);
+        rb->setChecked(checked);
+        if (checked) anyChecked = true;
+        m_accelGroup->addButton(rb);
+        m_accelList->addWidget(rb);
+        connect(rb, &QRadioButton::toggled, this, [this, sel](bool on) {
+            if (on) m_service->setAccelSelection(sel);
+        });
+    };
+
+    // AUTO is always offered and resolves to the best available engine.
+    addRadio(QStringLiteral("auto"), QStringLiteral("AUTO — best available"),
+             true, current == QLatin1String("auto"));
+
+    QStringList gpuNames;
+    for (const AcceleratorOption& o : accels) {
+        QString label = o.backend.toUpper();
+        if (!o.device.isEmpty()) label += QStringLiteral("  ·  %1").arg(o.device);
+        if (!o.available)        label += QStringLiteral("   (unavailable)");
+        addRadio(o.backend, label, o.available, o.available && current == o.backend);
+        if (o.available && o.backend != QLatin1String("cpu"))
+            gpuNames << o.backend.toUpper();
+    }
+
+    // Persisted pick no longer available → snap back to AUTO (also corrects the
+    // stored selection via the toggled handler).
+    if (!anyChecked && !m_accelGroup->buttons().isEmpty())
+        m_accelGroup->buttons().first()->setChecked(true);
+
+    if (accels.isEmpty())
+        m_accelStatus->setText(QStringLiteral("Detecting… (backend offline?)"));
+    else if (gpuNames.isEmpty())
+        m_accelStatus->setText(QStringLiteral("No GPU detected — running on CPU."));
+    else
+        m_accelStatus->setText(QStringLiteral("GPU available: %1").arg(gpuNames.join(QStringLiteral(", "))));
+}
+
 void SettingsPage::save()
 {
     QSettings s;
@@ -317,6 +379,7 @@ void SettingsPage::save()
     s.setValue(QStringLiteral("backend/socket"), m_socketEdit->text().trimmed());
     s.setValue(QStringLiteral("backend/binary"), m_binaryEdit->text().trimmed());
     s.setValue(QStringLiteral("backend/autostart"), m_autoStart->isChecked());
+    s.setValue(QStringLiteral("runtime/accel"), m_service->accelSelection());
 
     const int lvl = qMax(0, m_verbosity->checkedId());
     s.setValue(QStringLiteral("ui/verbosity"), lvl);
@@ -337,6 +400,7 @@ void SettingsPage::exportJson()
     o.insert(QStringLiteral("controlSocket"), m_socketEdit->text());
     o.insert(QStringLiteral("backendBinary"), m_binaryEdit->text());
     o.insert(QStringLiteral("autostart"), m_autoStart->isChecked());
+    o.insert(QStringLiteral("accelSelection"), m_service->accelSelection());
     o.insert(QStringLiteral("verbosity"), m_verbosity->checkedId());
     o.insert(QStringLiteral("accent"), m_accent->checkedId());
     QFile f(path);

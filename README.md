@@ -58,6 +58,7 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`, `detect`) applied in place via a pad probe — toggled live from the console |
 | **AI inference** | YOLO-family ONNX object detection (`detect`) through OpenCV DNN: model picker and confidence slider in the console, boxes drawn into the frame, model swappable mid-stream. Inference runs on a worker thread and the probe overlays the newest result, so detection cost never throttles the stream |
 | **Inference telemetry** | Real per-pipeline detector stats over the control protocol (`stats <id>`) — latency chart, TOTAL_OBJECTS / AVG_CONFIDENCE tiles, and detections in the event log |
+| **Acceleration** | Backends auto-detected at daemon start (CPU / Vulkan / CUDA) and reported over the protocol (`accelerators`); the console renders a capability-driven selector — only detected engines are offered, `AUTO` by default, CPU when no GPU. A per-deploy CPU/GPU choice threads through the pipeline (`accel <id> <sel>`) and always resolves to a runnable backend. **The YOLO detector runs on the GPU via ncnn + Vulkan** behind an `IInferenceBackend` seam — validated on a Radeon RX 6700-series (RADV): **≈24 ms/frame vs ≈57 ms on CPU** for yolov5n at 640² (~2.4×). Enabled by `scripts/build-ncnn.sh` (`-DWITH_GPU`); the weights are converted FP16→FP32→pnnx by `scripts/fetch-models.sh` (plain `onnx2ncnn` yields a graph that crashes ncnn's Vulkan path). Colourspace convert stays on the CPU (≈1 ms). CUDA is a compiled placeholder for a future NVIDIA card |
 | **Daemon control** | `MediaFusionGCV --serve <socket>`: full text protocol (create / devices / set-device / algos / start / stop / delete / list), one connection, serialized commands |
 | **Daemon lifecycle** | Console auto-spawns the daemon if unreachable, restarts it (`REBOOT_CORE`) or shuts it down (`TERMINATE_PID`); crash → status LED + tiles fall back to `NO_SIGNAL` |
 | **Device manager** | Camera enumeration (raw V4L2 and PipeWire providers, same-node twins deduplicated) with per-device caps (resolution / format / framerate) selection; the source element is built from the selected device; only modes the CPU pipeline can negotiate are listed (DMABuf/`DMA_DRM` import is planned) |
@@ -65,7 +66,7 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Telemetry** | Real per-stream FPS & throughput (sink pad probe); real host telemetry — AMD GPU temperature, VRAM, fan, GPU busy %, CPU package temp (hwmon, 1 Hz) |
 | **Observability** | App-wide event log with level filters and CSV export, including the full control-protocol transcript |
 | **Theming** | Generated QSS from design tokens; runtime accent-hue switching |
-| **Verification** | `gstreamer-check` suite (4 suites, 22 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
+| **Verification** | `gstreamer-check` suite (4 suites, 25 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
 
 ### Planned
 
@@ -74,7 +75,6 @@ interrupts operations; errors surface as log entries and tile badges.
 | **RAW vs AI compare** | Side-by-side comparison of the raw and processed branches of one source | engine `tee` support |
 | **More sources** | RTSP, GigE Vision, file and test sources (protocol chips already in the rail) | engine |
 | **Recording** | REC / REC ALL, freeze-frame, DVR scrubbing | engine |
-| **GPU inference** | Detector on the GPU. CPU-only today: this rig is AMD, so no CUDA, and OpenCV's OpenCL target needs an ICD that is not guaranteed present | ONNX Runtime or ncnn Vulkan |
 | **Deeper telemetry** | Frame-integrity accounting, memory bandwidth | engine |
 | **Pipeline editor** | Free node dragging & arbitrary graphs (today: fixed linear SOURCE → PROCESS → SINK, matching the engine) | engine |
 | **Remote operation** | INET sockets for console and engine on different hosts | — |
@@ -272,9 +272,11 @@ docs/
 
 1. **Engine `tee` support** — raw + processed branches from one source, unlocking the
    Compare page and per-tile RAW/processed modes.
-2. **GPU inference** — the detector is CPU-only today (~55 ms/frame for yolov5n at
-   640² on this rig). ONNX Runtime or ncnn Vulkan would give the AMD RX 6700 XT a
-   path; there is no CUDA option here.
+2. **GPU inference — done; two follow-ups.** The YOLO detector runs on ncnn + Vulkan
+   (~2.4× faster than CPU, validated on a Radeon RX 6700-series). Remaining: (a) the
+   GPU colour-convert segment is disabled — `glupload!glcolorconvert!gldownload`
+   delivered all-black frames on this RADV/GL stack, so convert stays on the CPU;
+   (b) fill in the CUDA placeholder when an NVIDIA card lands.
 3. **RTSP source** — first non-V4L2 protocol chip.
 4. **Recording** — REC / REC ALL to disk with the DVR transport bar.
 5. **Frame-integrity accounting** — drop counters and aggregate score on Analytics.

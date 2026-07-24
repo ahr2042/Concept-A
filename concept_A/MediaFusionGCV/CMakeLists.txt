@@ -24,6 +24,18 @@ endforeach()
 pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4>=4.8)
 message(STATUS "OpenCV ${opencv_VERSION} (${opencv_PREFIX})")
 
+# ── Optional GPU acceleration ─────────────────────────────────────────────────
+# WITH_GPU pulls in ncnn (built with Vulkan) for the detector's GPU path. It is
+# auto-detected: a machine without ncnn (CI, a fresh clone) still builds, CPU
+# only, exactly like it degrades to "no models available". scripts/build-ncnn.sh
+# installs a suitable ncnn into ~/.local, discovered via CMAKE_PREFIX_PATH below.
+# WITH_CUDA is the NVIDIA placeholder — OFF until that hardware exists; its code
+# paths are #ifdef'd out, not stubbed at runtime, so nothing NVIDIA links today.
+list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local" "/opt/ncnn")
+find_package(ncnn QUIET)
+option(WITH_GPU  "GPU inference via ncnn + Vulkan"          ${ncnn_FOUND})
+option(WITH_CUDA "NVIDIA/CUDA inference backend (placeholder)" OFF)
+
 # ── Shared library (everything except main.cpp) ───────────────────────────────
 set(LIB_SOURCES
     GStreamerSink.cpp
@@ -36,7 +48,10 @@ set(LIB_SOURCES
     FrameProcessor.cpp
     Algorithms.cpp
     Detector.cpp
+    InferenceBackend.cpp
     ModelRegistry.cpp
+    AccelBackend.cpp
+    AcceleratorRegistry.cpp
 )
 
 add_library(MediaFusionGCV_Lib STATIC ${LIB_SOURCES})
@@ -51,6 +66,23 @@ target_link_libraries(MediaFusionGCV_Lib PUBLIC
     PkgConfig::gstreamer-video
     PkgConfig::opencv
 )
+
+if(WITH_GPU)
+    find_package(Vulkan REQUIRED)
+    target_sources(MediaFusionGCV_Lib PRIVATE InferenceBackendNcnn.cpp)
+    target_link_libraries(MediaFusionGCV_Lib PUBLIC ncnn Vulkan::Vulkan)
+    target_compile_definitions(MediaFusionGCV_Lib PUBLIC MEDIAFUSION_WITH_GPU)
+    message(STATUS "GPU inference: ncnn ${ncnn_VERSION} + Vulkan ENABLED")
+else()
+    message(STATUS "GPU inference: DISABLED (ncnn not found) -- CPU-only build")
+endif()
+
+if(WITH_CUDA)
+    # Placeholder: no CUDA libs are linked yet; the backend is a compiled stub.
+    target_sources(MediaFusionGCV_Lib PRIVATE InferenceBackendCuda.cpp)
+    target_compile_definitions(MediaFusionGCV_Lib PUBLIC MEDIAFUSION_WITH_CUDA)
+    message(STATUS "CUDA backend: placeholder compiled in (no NVIDIA libs linked)")
+endif()
 
 # ── Main executable ───────────────────────────────────────────────────────────
 add_executable(${PROJECT_NAME} main.cpp)

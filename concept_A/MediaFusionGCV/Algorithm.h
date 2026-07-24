@@ -1,6 +1,7 @@
 #pragma once
 
 #include "InferenceStats.h"
+#include "AccelBackend.h"
 
 #include <opencv2/core.hpp>
 
@@ -21,6 +22,12 @@ public:
     virtual ~Algorithm() = default;
     virtual const char* name() const = 0;
     virtual void        apply(cv::Mat& frame) = 0;
+
+    // Optional: choose the acceleration backend this stage runs on. Called
+    // before the stage processes frames and again whenever the resolved backend
+    // changes. Plain CPU OpenCV ops ignore it; an inference stage uses it to pick
+    // between its cv::dnn (CPU) and ncnn-Vulkan / CUDA engines.
+    virtual void        setAccel(AccelBackend) {}
 
     // Optional: an inference stage reports what it last produced here so the
     // control protocol can serve DETECTION_SUMMARY / latency telemetry without

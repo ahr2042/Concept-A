@@ -18,6 +18,8 @@ struct ModelInfo
     std::string labelsPath;       // absolute path to the labels file, "" if none
     int         inputSize  = 640; // square network input (YOLO-family default)
     size_t      classCount = 0;   // labels found, 0 when there is no sidecar
+    std::string ncnnParam;        // sibling <stem>.param for the ncnn/Vulkan backend, "" if none
+    std::string ncnnBin;          // sibling <stem>.bin, "" if none
 };
 
 // Directories searched, in priority order:
