@@ -40,6 +40,11 @@ public:
     void                     setAlgorithms(const std::vector<std::string>& names);
     std::vector<std::string> activeAlgorithms() const;
 
+    // Resolved acceleration backend for the chain (CPU/Vulkan/CUDA). Stored and
+    // pushed to every current and future stage, so a detector added later still
+    // runs on the selected engine. Thread-safe.
+    void                     setAccel(AccelBackend backend);
+
     // Inference-stage settings. They live here rather than inside the detector
     // because setAlgorithms() rebuilds the chain from names — the selected
     // model has to survive that, and has to be applied to a detector that
@@ -56,6 +61,7 @@ private:
 
     std::vector<std::unique_ptr<Algorithm>> m_algos;
     DetectorConfig                          m_detectorConfig;
+    AccelBackend                            m_accel = AccelBackend::CPU;
     mutable std::mutex                      m_mutex;
     GstVideoInfo                            m_info;
     bool                                    m_haveInfo = false;

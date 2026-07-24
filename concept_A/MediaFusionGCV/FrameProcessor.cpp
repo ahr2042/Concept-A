@@ -35,6 +35,11 @@ FrameProcessor::~FrameProcessor()
 void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 {
     DetectorConfig cfg = detectorConfig();
+    AccelBackend   accel;
+    {
+        std::lock_guard<std::mutex> lk(m_mutex);
+        accel = m_accel;
+    }
 
     std::vector<std::unique_ptr<Algorithm>> built;
     built.reserve(names.size());
@@ -42,6 +47,9 @@ void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
         auto a = makeAlgorithm(n);
         if (!a)
             continue;
+        // Pick the resolved backend before loading so a detector configures the
+        // right engine on the spot; plain filters ignore it.
+        a->setAccel(accel);
         // A detector joining the chain inherits the model chosen earlier;
         // loading happens here, off the streaming thread.
         if (auto* det = dynamic_cast<DetectorAlgorithm*>(a.get()))
@@ -51,6 +59,16 @@ void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 
     std::lock_guard<std::mutex> lk(m_mutex);
     m_algos = std::move(built);
+}
+
+void FrameProcessor::setAccel(AccelBackend backend)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    m_accel = backend;
+    // Re-target any stage already in the chain. For a detector this means the
+    // next configure()/reload runs on the new engine.
+    for (const auto& a : m_algos)
+        a->setAccel(backend);
 }
 
 bool FrameProcessor::setDetectorConfig(const DetectorConfig& cfg)

@@ -4,6 +4,7 @@
 #include "GStreamerSinkApplication.h"
 #include "FrameProcessor.h"
 #include "ModelRegistry.h"
+#include "AcceleratorRegistry.h"
 
 PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const char* pipelineName)
 {
@@ -58,6 +59,12 @@ PipelineManager::~PipelineManager()
     delete source;    source    = nullptr;
     delete sink;      sink      = nullptr;
     delete processor; processor = nullptr;
+
+    // Drop our explicit refs on the optional GPU segment (2→1) before the bin
+    // frees its own (1→0), mirroring the source/sink ordering above.
+    for (GstElement* e : m_gpuElements)
+        if (e) gst_object_unref(e);
+    m_gpuElements.clear();
 
     if (pipeline) {
         gst_object_unref(pipeline);
@@ -136,20 +143,48 @@ std::string PipelineManager::getStreamEndpoint() const
     return sink ? sink->endpoint() : std::string();
 }
 
+void PipelineManager::ensureProcessor()
+{
+    if (processor)
+        return;
+    processor = new FrameProcessor();
+    // Adopt the chosen backend immediately. Without this, selecting GPU before
+    // the processor exists (as the GUI does: accel, then model/algos) would build
+    // a detector that configures on cv::dnn and never switches to the GPU engine.
+    processor->setAccel(m_backend);
+}
+
 void PipelineManager::setProcessingEnabled(bool enabled)
 {
-    if (enabled && !processor)
-        processor = new FrameProcessor();
+    if (enabled)
+        ensureProcessor();
     else if (!enabled && processor) {
         delete processor;
         processor = nullptr;
     }
 }
 
+errorState PipelineManager::setAccel(AccelSelection selection)
+{
+    m_accelSel = selection;
+    // Resolve now for an immediate, honest echo (AUTO -> a concrete backend) and
+    // apply to a processor that already exists. buildPipeline() re-resolves at
+    // the next start, so hardware that appears/disappears in between is still
+    // honoured and the resolved backend selects the decode topology there.
+    m_backend = resolveBackend(selection);
+    if (processor) {
+        processor->setAccel(m_backend);
+        // Reload an already-built detector on the new engine, so changing the
+        // selection after a model was chosen switches backends too — not only
+        // when accel is set before the model (the GUI's order).
+        processor->setDetectorConfig(processor->detectorConfig());
+    }
+    return errorState::NO_ERR;
+}
+
 errorState PipelineManager::setAlgorithms(const std::vector<std::string>& names)
 {
-    if (!processor)
-        processor = new FrameProcessor();   // selecting algorithms enables the stage
+    ensureProcessor();                      // selecting algorithms enables the stage
     if (!processor->valid())
         return errorState::OBJECT_CREATION_ERR;
     processor->setAlgorithms(names);
@@ -165,8 +200,7 @@ errorState PipelineManager::setDetectorModel(const std::string& modelNameOrPath)
     if (!modelNameOrPath.empty() && !findModel(modelNameOrPath, info))
         return errorState::LOAD_MODEL_ERR;
 
-    if (!processor)
-        processor = new FrameProcessor();   // model choice survives until "detect" is selected
+    ensureProcessor();                      // model choice survives until "detect" is selected
     if (!processor->valid())
         return errorState::OBJECT_CREATION_ERR;
 
@@ -179,8 +213,7 @@ errorState PipelineManager::setDetectorModel(const std::string& modelNameOrPath)
 
 errorState PipelineManager::setDetectorParams(float confidence, float nms, bool drawBoxes)
 {
-    if (!processor)
-        processor = new FrameProcessor();
+    ensureProcessor();
     if (!processor->valid())
         return errorState::OBJECT_CREATION_ERR;
 
@@ -197,11 +230,73 @@ bool PipelineManager::inferenceStats(InferenceStats& out) const
     return processor && processor->valid() && processor->inferenceStats(out);
 }
 
+// The GStreamer element chain that does the colorspace convert on the GPU for a
+// given backend, or empty if that backend has no offload path here. For a raw
+// v4l2 camera there is nothing to "decode"; the win is moving the convert off the
+// CPU. We keep the source side in system memory (glupload uploads it) rather than
+// importing DMABuf, so device enumeration is unchanged and the only added cost is
+// one upload — symmetric with the gldownload that returns the frame to the
+// in-place BGR pad probe.
+static std::vector<const char*> accelSegmentFactories(AccelBackend /*b*/)
+{
+    // GPU colorspace-convert segment, DISABLED. The glupload!glcolorconvert!
+    // gldownload chain negotiated and streamed but delivered all-black frames to
+    // the in-place BGR pad probe on this RADV/GL stack (framemean=0), which
+    // starved the detector. Colorspace convert is ~1 ms on the CPU anyway, so the
+    // high-value GPU work — the ncnn-Vulkan detector forward pass — is where the
+    // win is (≈2.4x). Left as a seam: return the element chain here once the GL
+    // download path is validated (or swap in a VA/`va` postproc that keeps data
+    // in system memory correctly).
+    return {};
+}
+
+bool PipelineManager::makeAccelSegment(std::vector<GstElement*>& out) const
+{
+    out.clear();
+    const std::vector<const char*> factories = accelSegmentFactories(m_backend);
+    if (factories.empty())
+        return false;
+
+    // All-or-nothing: if any element is missing (plugin/driver absent) drop to
+    // the CPU topology rather than build a half GPU chain that cannot link.
+    for (const char* f : factories) {
+        GstElementFactory* fac = gst_element_factory_find(f);
+        if (!fac) {
+            std::cerr << "accel: element '" << f << "' unavailable; using CPU pipeline\n";
+            return false;
+        }
+        gst_object_unref(fac);
+    }
+
+    for (const char* f : factories) {
+        GstElement* e = gst_element_factory_make(f, nullptr);
+        if (!e) {
+            for (GstElement* made : out) gst_object_unref(made);
+            out.clear();
+            return false;
+        }
+        out.push_back(e);
+    }
+    return true;
+}
+
 errorState PipelineManager::buildPipeline()
 {
     if (!source || !sink) return errorState::NULLPTR_ERR;
 
     const bool useProcessor = processor && processor->valid();
+
+    // Resolve the operator's selection against detected hardware at start time:
+    // AUTO tracks whatever is present now. On a GPU backend, try to build a GPU
+    // convert segment; a missing plugin leaves gpuSeg empty and we stay on the
+    // CPU topology, so start never fails for lack of a GPU element.
+    m_backend = resolveBackend(m_accelSel);
+    if (useProcessor)
+        processor->setAccel(m_backend);
+
+    std::vector<GstElement*> gpuSeg;
+    if (m_backend != AccelBackend::CPU && makeAccelSegment(gpuSeg))
+        std::cerr << "accel: GPU convert segment active (" << accelBackendName(m_backend) << ")\n";
 
     gst_bin_add_many(GST_BIN(pipeline),
         source->sourceElement,
@@ -225,11 +320,32 @@ errorState PipelineManager::buildPipeline()
         gst_object_ref(processor->filterElement);
     }
 
+    // Own the GPU segment the same way: bin sinks the floating ref, we keep an
+    // explicit one that the destructor drops (see m_gpuElements).
+    for (GstElement* e : gpuSeg) {
+        gst_bin_add(GST_BIN(pipeline), e);
+        gst_object_ref(e);
+        m_gpuElements.push_back(e);
+    }
+
     struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
     std::vector<LinkStep> steps = {
-        { source->sourceElement, source->capsFilter, "source → src-capsfilter"        },
-        { source->capsFilter,    source->converter,  "src-capsfilter → src-converter"  },
+        { source->sourceElement, source->capsFilter, "source → src-capsfilter" },
     };
+
+    // src-capsfilter → [GPU convert segment] → src-converter. The trailing
+    // videoconvert still guarantees exact BGR/system-memory for the pad probe,
+    // so the unixfdsink memfd contract is untouched whether or not the GPU
+    // segment is present.
+    if (!gpuSeg.empty()) {
+        steps.push_back({ source->capsFilter, gpuSeg.front(), "src-capsfilter → gpu-in" });
+        for (size_t i = 1; i < gpuSeg.size(); ++i)
+            steps.push_back({ gpuSeg[i - 1], gpuSeg[i], "gpu → gpu" });
+        steps.push_back({ gpuSeg.back(), source->converter, "gpu-out → src-converter" });
+    } else {
+        steps.push_back({ source->capsFilter, source->converter, "src-capsfilter → src-converter" });
+    }
+
     if (useProcessor) {
         // Splice the BGR capsfilter in; its src-pad probe processes each buffer
         // in place (see FrameProcessor), so downstream allocation stays intact.

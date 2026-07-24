@@ -10,6 +10,7 @@
 #include "SinkType.h"
 #include "errorState.h"
 #include "InferenceStats.h"
+#include "AccelBackend.h"
 
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
@@ -53,6 +54,11 @@ public:
     // False when this pipeline has no inference stage in its chain.
     bool inferenceStats(InferenceStats& out) const;
 
+    // Acceleration backend selection (auto/cpu/vulkan/cuda). Resolved against the
+    // detected hardware at the next startStreaming(), since the choice shapes the
+    // decode/convert topology built there and cannot change while PLAYING.
+    errorState setAccel(AccelSelection selection);
+
 private:
     GstElement*           pipeline       = nullptr;
     GThread*              pipelineThread = nullptr;
@@ -60,7 +66,20 @@ private:
     GStreamerSink*         sink           = nullptr;
     FrameProcessor*        processor      = nullptr;
     std::atomic<bool>     stopRequested  { false };
+    AccelSelection        m_accelSel     = AccelSelection::AUTO;
+    AccelBackend          m_backend      = AccelBackend::CPU;   // resolved at build
+    std::vector<GstElement*> m_gpuElements;                     // optional GPU convert segment
 
+    // Lazily creates the FrameProcessor, having it adopt the currently-selected
+    // backend (m_backend) at once — so a detector configured next runs on the
+    // right engine, not just from the next start().
+    void            ensureProcessor();
     errorState      buildPipeline();
+    // Builds the GPU colorspace-convert element chain for m_backend (e.g.
+    // glupload!glcolorconvert!gldownload). Returns false — leaving out empty — if
+    // the backend is CPU or any element is unavailable, so the caller stays on
+    // the CPU topology. The returned elements carry a floating ref (not yet in a
+    // bin); buildPipeline() takes ownership.
+    bool            makeAccelSegment(std::vector<GstElement*>& out) const;
     static gpointer startLoop(gpointer data);
 };

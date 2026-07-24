@@ -1,4 +1,5 @@
 #include "MediaFusionGCV_API.h"
+#include "AccelBackend.h"
 
 #include <iostream>
 #include <sstream>
@@ -114,10 +115,12 @@ static std::string helpText()
         << "  set-device <id> <dev> <cap>      Select Device [dev] Cap [cap] from 'devices' output\n"
         << "  algos <id> <csv>                 Set OpenCV algorithm chain (empty csv disables)\n"
         << "  algos-list                       List available algorithm names\n"
+        << "  accelerators                     List detected accel backends (cpu/vulkan/cuda)\n"
         << "  models                           List installed detector models\n"
         << "  model <id> [name]                Load a detector model (no name unloads it)\n"
         << "  detect-params <id> <conf> <nms> [draw]\n"
         << "                                   Detector thresholds (0..1) and box overlay (0/1)\n"
+        << "  accel <id> <auto|cpu|vulkan|cuda>  Select accel backend (applied at next start)\n"
         << "  stats <id>                       Inference latency and last detections\n"
         << "  start <id>                       Start streaming (app sink -> prints socket path)\n"
         << "  stop <id>                        Stop streaming\n"
@@ -228,6 +231,28 @@ static std::string handleCommand(const std::string& line)
     }
     else if (cmd == "algos-list") {
         out << "OK " << mediaLib_availableAlgorithms() << "\n";
+    }
+    else if (cmd == "accelerators") {
+        // One line per backend the host can run; the GUI shows only available=1.
+        out << "OK\n" << mediaLib_detectAccelerators();
+    }
+    else if (cmd == "accel") {
+        size_t id = 0;
+        std::string sel;
+        if (!(iss >> id >> sel))
+            out << "ERR INVALID_ARGS accel <id> <auto|cpu|vulkan|cuda>\n";
+        else {
+            AccelSelection s;
+            if (!parseAccelSelection(sel, s))
+                out << "ERR INVALID_ARGS unknown backend '" << sel
+                    << "' -- use: auto cpu vulkan cuda\n";
+            else {
+                errorState err = mediaLib_setAccel(id, static_cast<int32_t>(s));
+                out << (err == errorState::NO_ERR
+                        ? ("OK " + std::string(accelSelectionName(s)) + "\n")
+                        : ("ERR " + errStr(err) + "\n"));
+            }
+        }
     }
     else if (cmd == "models") {
         const std::string listing = mediaLib_availableModels();

@@ -2,7 +2,9 @@
 #include "PipelineManager.h"
 #include "Algorithms.h"
 #include "ModelRegistry.h"
+#include "AcceleratorRegistry.h"
 
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -15,6 +17,18 @@ std::vector<PipelineManager*> pipelines;
 errorState mediaLib_GStreamerInit(int argc, char* argv[])
 {
 	gst_init(&argc, &argv);
+
+	// Probe acceleration once, here, so the cost (creating a Vulkan instance to
+	// enumerate devices) is paid at startup and the detected set is ready for the
+	// first 'accelerators' query. Cached thereafter (see AcceleratorRegistry).
+	std::string summary;
+	for (const auto& a : detectAccelerators())
+		if (a.available) {
+			if (!summary.empty()) summary += ", ";
+			summary += accelBackendName(a.backend);
+			if (!a.device.empty()) summary += " (" + a.device + ")";
+		}
+	std::cerr << "accelerators detected: " << (summary.empty() ? "cpu" : summary) << "\n";
 	return errorState::NO_ERR;
 }
 
@@ -192,5 +206,25 @@ errorState mediaLib_getInferenceStats(size_t pipelineId, InferenceStats& stats)
 	if (!pipelines[pipelineId]->inferenceStats(stats))
 		return errorState::NOT_IMPLEMENTED_YET_ERR;
 	return errorState::NO_ERR;
+}
+
+const char* mediaLib_detectAccelerators()
+{
+	static thread_local std::string listing;
+	listing.clear();
+	for (const auto& a : detectAccelerators()) {
+		listing += "backend=";    listing += accelBackendName(a.backend);
+		listing += " available="; listing += (a.available ? "1" : "0");
+		listing += " device=";    listing += (a.device.empty() ? "-" : a.device);
+		listing += "\n";
+	}
+	return listing.c_str();
+}
+
+errorState mediaLib_setAccel(size_t pipelineId, int32_t selection)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+	return pipelines[pipelineId]->setAccel(static_cast<AccelSelection>(selection));
 }
 
