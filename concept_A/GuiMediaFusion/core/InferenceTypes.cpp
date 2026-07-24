@@ -47,6 +47,31 @@ bool inferenceparser::parseModels(const QString& reply, QVector<DetectorModel>& 
     return true;
 }
 
+bool inferenceparser::parseAccelerators(const QString& reply, QVector<AcceleratorOption>& out)
+{
+    out.clear();
+    if (!reply.startsWith(QLatin1String("OK")))
+        return false;
+
+    const QStringList lines = reply.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    for (const QString& raw : lines) {
+        const QString line = raw.trimmed();
+        if (!line.startsWith(QLatin1String("backend=")))
+            continue;
+
+        const QStringList  tokens = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        AcceleratorOption  a;
+        a.backend   = value(tokens, QStringLiteral("backend"));
+        a.available = value(tokens, QStringLiteral("available")).toInt() != 0;
+        a.device    = tailValue(line, QStringLiteral("device"));
+        if (a.device == QLatin1String("-"))
+            a.device.clear();
+        if (!a.backend.isEmpty())
+            out.push_back(a);
+    }
+    return true;
+}
+
 bool inferenceparser::parseStats(const QString& reply, InferenceSnapshot& snapshot)
 {
     snapshot = InferenceSnapshot{};

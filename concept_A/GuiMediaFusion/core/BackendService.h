@@ -41,9 +41,11 @@ public slots:
     void queryDevices();
     void queryAlgorithms();
     void queryModels();
+    void queryAccelerators();
     void deploy(int sessionId, int deviceIndex, int capIndex,
                 const QString& algosCsv, bool screenSink, const QString& name,
-                const QString& detectorModel, double confidence, double nms, bool drawBoxes);
+                const QString& detectorModel, double confidence, double nms, bool drawBoxes,
+                const QString& accelSelection);
     void applyDetector(int sessionId, const QString& model,
                        double confidence, double nms, bool drawBoxes);
     void pollStats();                          // one `stats` per live session
@@ -56,6 +58,7 @@ signals:
     void devicesReady(bool ok, const QVector<DeviceInfo>& devices);
     void algorithmsReady(const QStringList& algorithms);
     void modelsReady(const QVector<DetectorModel>& models);
+    void acceleratorsReady(const QVector<AcceleratorOption>& accelerators);
     void detectorApplied(int sessionId, bool ok, const QString& detail);
     void inferenceStats(int sessionId, const InferenceSnapshot& snapshot);
     void sessionStarted(int sessionId, const QString& videoSocket, const QString& description);
@@ -97,6 +100,11 @@ public:
         double  confidence  = 0.25;             // YOLOv5's own default
         double  nms         = 0.45;
         bool    drawBoxes   = true;
+
+        // Acceleration backend for this session: "auto"/"cpu"/"vulkan"/"cuda".
+        // Sent as `accel <id> <sel>` before start; the daemon resolves AUTO and
+        // falls back to CPU for anything unavailable, so a stale pick never fails.
+        QString accelSelection = QStringLiteral("auto");
     };
 
     explicit BackendService(QObject* parent = nullptr);
@@ -109,6 +117,12 @@ public:
     void    setControlSocketPath(const QString& p) { m_socketPath = p; }
     void    setBackendBinary(const QString& b)     { m_binary = b; }
     void    setAutostart(bool on)                  { m_autostart = on; }
+    QString accelSelection() const                 { return m_accelSelection; }
+    void    setAccelSelection(const QString& s) {
+        if (m_accelSelection == s) return;
+        m_accelSelection = s;
+        emit accelSelectionChanged(s);             // keep the Settings radios + Dashboard toggle in sync
+    }
 
     DaemonState state() const { return m_state; }
     qint64      daemonPid() const;
@@ -116,6 +130,7 @@ public:
     const QVector<DeviceInfo>& devices() const      { return m_devices; }
     const QStringList& algorithms() const           { return m_algorithms; }
     const QVector<DetectorModel>& models() const    { return m_models; }
+    const QVector<AcceleratorOption>& accelerators() const { return m_accelerators; }
 
     // async operations (results via signals)
     void ensureOnline();                        // connect, spawning if allowed
@@ -124,6 +139,7 @@ public:
     void refreshDevices();
     void refreshAlgorithms();
     void refreshModels();
+    void refreshAccelerators();
     int  deploy(const DeploySpec& spec);        // returns sessionId
     void stop(int sessionId);
     void stopAll();
@@ -144,6 +160,8 @@ signals:
     void sessionStopped(int sessionId);
     void sessionFailed(int sessionId, const QString& error);
     void modelsChanged(const QVector<DetectorModel>& models);
+    void acceleratorsChanged(const QVector<AcceleratorOption>& accelerators);
+    void accelSelectionChanged(const QString& selection);
     void detectorChanged(int sessionId, bool ok, const QString& detail);
     void inferenceStatsChanged(int sessionId, const InferenceSnapshot& snapshot);
 
@@ -174,5 +192,7 @@ private:
     QVector<DeviceInfo>    m_devices;
     QStringList            m_algorithms;
     QVector<DetectorModel> m_models;
+    QVector<AcceleratorOption> m_accelerators;
+    QString                m_accelSelection = QStringLiteral("auto");
     QHash<int, QString>    m_lastDetections;   // sessionId → last logged label set
 };

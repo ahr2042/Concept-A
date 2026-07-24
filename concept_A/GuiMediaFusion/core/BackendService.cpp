@@ -118,6 +118,15 @@ void BackendWorker::queryModels()
     emit modelsReady(models);
 }
 
+void BackendWorker::queryAccelerators()
+{
+    QString reply;
+    QVector<AcceleratorOption> accels;
+    if (cmd(QStringLiteral("accelerators"), reply))
+        inferenceparser::parseAccelerators(reply, accels);
+    emit acceleratorsReady(accels);
+}
+
 // Sends the model + thresholds for one daemon pipeline. `detail` carries the
 // daemon's complaint when this returns false.
 bool BackendWorker::sendDetector(long daemonId, const QString& model,
@@ -171,7 +180,7 @@ void BackendWorker::pollStats()
 void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
                            const QString& algosCsv, bool screenSink, const QString& name,
                            const QString& detectorModel, double confidence, double nms,
-                           bool drawBoxes)
+                           bool drawBoxes, const QString& accelSelection)
 {
     const long id = createPipeline(QStringLiteral("camera"),
                                    screenSink ? QStringLiteral("screen") : QStringLiteral("app"),
@@ -190,6 +199,15 @@ void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
         emit sessionFailed(sessionId, QStringLiteral("set-device %1/%2 rejected: %3")
                                           .arg(deviceIndex).arg(capIndex).arg(reply));
         return;
+    }
+
+    // Select the acceleration backend before start — it shapes the pipeline
+    // topology, fixed once PLAYING. Non-fatal: the daemon resolves an unavailable
+    // pick to CPU, so a stale selection degrades rather than blocking the stream.
+    if (!accelSelection.isEmpty()) {
+        if (!cmd(QStringLiteral("accel %1 %2").arg(id).arg(accelSelection), reply)
+            || !reply.startsWith(QStringLiteral("OK")))
+            emit wire(AppLog::Warn, QStringLiteral("accel '%1' rejected: %2").arg(accelSelection, reply));
     }
 
     // Load the detector before the chain is set: makeAlgorithm("detect") picks
@@ -283,6 +301,7 @@ BackendService::BackendService(QObject* parent)
 {
     qRegisterMetaType<QVector<DeviceInfo>>("QVector<DeviceInfo>");
     qRegisterMetaType<QVector<DetectorModel>>("QVector<DetectorModel>");
+    qRegisterMetaType<QVector<AcceleratorOption>>("QVector<AcceleratorOption>");
     qRegisterMetaType<InferenceSnapshot>("InferenceSnapshot");
 
     m_worker = new BackendWorker;
@@ -317,6 +336,18 @@ BackendService::BackendService(QObject* parent)
                            .arg(names.isEmpty() ? QStringLiteral("(none — run scripts/fetch-models.sh)")
                                                 : names.join(", ")));
         emit modelsChanged(m);
+    });
+    connect(m_worker, &BackendWorker::acceleratorsReady, this,
+            [this](const QVector<AcceleratorOption>& a) {
+        m_accelerators = a;
+        QStringList avail;
+        for (const AcceleratorOption& o : a)
+            if (o.available)
+                avail << (o.device.isEmpty() ? o.backend
+                                             : QStringLiteral("%1 (%2)").arg(o.backend, o.device));
+        logInfo("CTL", QStringLiteral("accelerators: %1")
+                           .arg(avail.isEmpty() ? QStringLiteral("cpu") : avail.join(", ")));
+        emit acceleratorsChanged(a);
     });
     connect(m_worker, &BackendWorker::detectorApplied, this,
             [this](int id, bool ok, const QString& detail) {
@@ -448,6 +479,7 @@ void BackendService::onWorkerConnected(bool ok, const QString& socketPath)
         setState(DaemonState::Online);
         refreshAlgorithms();
         refreshModels();
+        refreshAccelerators();
         refreshDevices();
         return;
     }
@@ -529,13 +561,18 @@ void BackendService::refreshModels()
     QMetaObject::invokeMethod(m_worker, &BackendWorker::queryModels, Qt::QueuedConnection);
 }
 
+void BackendService::refreshAccelerators()
+{
+    QMetaObject::invokeMethod(m_worker, &BackendWorker::queryAccelerators, Qt::QueuedConnection);
+}
+
 int BackendService::deploy(const DeploySpec& spec)
 {
     const int sessionId = m_nextSession++;
     QMetaObject::invokeMethod(m_worker, [w = m_worker, sessionId, spec] {
         w->deploy(sessionId, spec.deviceIndex, spec.capIndex, spec.algosCsv,
                   spec.screenSink, spec.name, spec.detectorModel,
-                  spec.confidence, spec.nms, spec.drawBoxes);
+                  spec.confidence, spec.nms, spec.drawBoxes, spec.accelSelection);
     }, Qt::QueuedConnection);
     return sessionId;
 }

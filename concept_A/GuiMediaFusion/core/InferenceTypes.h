@@ -23,6 +23,14 @@ struct DetectorModel {
     QString path;
 };
 
+// One backend from the daemon's `accelerators` reply. The GUI renders a picker
+// from these: only `available` ones are selectable, plus an always-present AUTO.
+struct AcceleratorOption {
+    QString backend;              // "cpu" / "vulkan" / "cuda"
+    QString device;               // human-readable device, "" when none
+    bool    available = false;    // usable on this host with this build
+};
+
 struct DetectionBox {
     QString label;
     double  confidence = 0.0;
@@ -52,7 +60,12 @@ namespace inferenceparser {
 bool parseModels(const QString& reply, QVector<DetectorModel>& models);
 bool parseStats(const QString& reply, InferenceSnapshot& snapshot);
 
+// Parses the `accelerators` reply (lines: backend=… available=0|1 device=…).
+// True when the reply started with "OK".
+bool parseAccelerators(const QString& reply, QVector<AcceleratorOption>& out);
+
 } // namespace inferenceparser
 
 Q_DECLARE_METATYPE(DetectorModel)
 Q_DECLARE_METATYPE(InferenceSnapshot)
+Q_DECLARE_METATYPE(AcceleratorOption)

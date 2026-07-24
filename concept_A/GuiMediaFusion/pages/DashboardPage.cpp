@@ -223,9 +223,19 @@ QWidget* DashboardPage::buildConfigPanel()
     accelText->addWidget(m_hwLabel);
     accelLay->addLayout(accelText);
     accelLay->addStretch(1);
-    auto* accelToggle = new vos::ToggleSwitch(accelCard);
-    vos::markPlanned(accelToggle, QStringLiteral("PLANNED — inference acceleration lands with the ONNX stage"));
-    accelLay->addWidget(accelToggle);
+    m_accelToggle = new vos::ToggleSwitch(accelCard);
+    connect(m_accelToggle, &vos::ToggleSwitch::toggled, this, [this](bool on) {
+        // ON = let the detector use the GPU (AUTO resolves to Vulkan); OFF = CPU.
+        m_service->setAccelSelection(on ? QStringLiteral("auto") : QStringLiteral("cpu"));
+    });
+    connect(m_service, &BackendService::acceleratorsChanged, this,
+            [this](const QVector<AcceleratorOption>&) { refreshAccelToggle(); });
+    connect(m_service, &BackendService::accelSelectionChanged, this,
+            [this](const QString&) { refreshAccelToggle(); },
+            Qt::QueuedConnection);   // sync with Settings radios (deferred; see SettingsPage)
+    accelLay->addWidget(m_accelToggle);
+    refreshAccelToggle();
+    m_service->refreshAccelerators();
     outer->addWidget(accelCard);
 
     outer->addWidget(vos::makeHSeparator(panel));
@@ -407,6 +417,19 @@ QString DashboardPage::algosCsv() const
         if (cb->isChecked())
             active << cb->text().toLower();
     return active.join(',');
+}
+
+void DashboardPage::refreshAccelToggle()
+{
+    if (!m_accelToggle) return;
+    bool gpu = false;
+    for (const AcceleratorOption& o : m_service->accelerators())
+        if (o.available && o.backend != QLatin1String("cpu")) gpu = true;
+    m_accelToggle->setEnabled(gpu);
+    m_accelToggle->setChecked(gpu && m_service->accelSelection() != QLatin1String("cpu"));
+    m_accelToggle->setToolTip(gpu
+        ? QStringLiteral("Run the detector on the GPU (ncnn + Vulkan). Applied on the next deploy.")
+        : QStringLiteral("No GPU detected — CPU only."));
 }
 
 void DashboardPage::onStart()

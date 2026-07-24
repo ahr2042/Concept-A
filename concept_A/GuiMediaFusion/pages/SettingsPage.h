@@ -9,10 +9,14 @@
 
 #include <QWidget>
 
+#include "../core/InferenceTypes.h"   // AcceleratorOption
+
 class BackendService;
 class QLineEdit;
 class QCheckBox;
 class QButtonGroup;
+class QVBoxLayout;
+class QLabel;
 
 class SettingsPage : public QWidget
 {
@@ -33,6 +37,9 @@ private:
     QWidget* buildPlannedTab(const QString& what);
     void     save();
     void     exportJson();
+    // Repopulates the backend-selector radios from a detection result — only
+    // available engines are enabled, plus an always-present AUTO.
+    void     rebuildAccelerators(const QVector<AcceleratorOption>& accels);
 
     BackendService* m_service;
     QLineEdit*    m_socketEdit = nullptr;
@@ -41,4 +48,7 @@ private:
     QButtonGroup* m_verbosity  = nullptr;
     QButtonGroup* m_accent     = nullptr;
     QCheckBox*    m_ledPulse   = nullptr;
+    QButtonGroup* m_accelGroup  = nullptr;   // backend radios (auto/cpu/vulkan/cuda)
+    QVBoxLayout*  m_accelList   = nullptr;   // container repopulated on detection
+    QLabel*       m_accelStatus = nullptr;   // "GPU available: …" / "CPU only"
 };

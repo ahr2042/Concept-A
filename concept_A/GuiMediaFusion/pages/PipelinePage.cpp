@@ -383,6 +383,7 @@ void PipelinePage::onDeploy()
     spec.name       = QStringLiteral("pipeline-editor");
     if (m_modelBox->isEnabled())
         spec.detectorModel = m_modelBox->currentData().toString();
+    spec.accelSelection = m_service->accelSelection();
     m_sessionId = m_service->deploy(spec);
     m_deployBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("DEPLOYING…"));
