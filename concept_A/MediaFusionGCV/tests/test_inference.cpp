@@ -10,6 +10,7 @@
 #include "MediaFusionGCV_API.h"
 #include "ModelRegistry.h"
 #include "Detector.h"
+#include "AcceleratorRegistry.h"
 
 // These tests must pass on a machine with no model weights installed — that is
 // the state of a fresh clone and of CI, since models/ is gitignored and fetched
@@ -147,6 +148,68 @@ GST_START_TEST(test_detector_runs_when_a_model_is_installed)
 }
 GST_END_TEST
 
+// Detection must always offer CPU, list each backend exactly once, and — on any
+// box — never contradict itself. These invariants hold with or without a GPU:
+// on a CPU-only build (no WITH_GPU) vulkan/cuda are simply reported unavailable.
+GST_START_TEST(test_accelerators_detection_invariants)
+{
+    const auto& accels = detectAccelerators();
+    fail_unless(!accels.empty(), "detection returned nothing");
+
+    bool haveCpu = false;
+    int  cpu = 0, vulkan = 0, cuda = 0;
+    for (const auto& a : accels) {
+        switch (a.backend) {
+            case AccelBackend::CPU:    ++cpu;    haveCpu = haveCpu || a.available; break;
+            case AccelBackend::VULKAN: ++vulkan; break;
+            case AccelBackend::CUDA:   ++cuda;   break;
+        }
+    }
+    fail_unless(haveCpu, "CPU must always be available");
+    fail_unless(cpu == 1 && vulkan == 1 && cuda == 1,
+        "each backend must appear exactly once (cpu=%d vulkan=%d cuda=%d)", cpu, vulkan, cuda);
+}
+GST_END_TEST
+
+// resolveBackend() must return a backend that is actually available for every
+// selection — so a stale or optimistic pick (e.g. VULKAN on a CPU-only box)
+// degrades to CPU rather than failing a stream.
+GST_START_TEST(test_resolve_backend_is_always_runnable)
+{
+    const AccelSelection sels[] = { AccelSelection::AUTO, AccelSelection::CPU,
+                                    AccelSelection::VULKAN, AccelSelection::CUDA };
+    for (AccelSelection sel : sels) {
+        const AccelBackend b = resolveBackend(sel);
+        bool available = false;
+        for (const auto& a : detectAccelerators())
+            if (a.backend == b) available = a.available;
+        fail_unless(available, "resolveBackend(%d) chose an unavailable backend %d",
+            (int)sel, (int)b);
+    }
+    fail_unless(resolveBackend(AccelSelection::CPU) == AccelBackend::CPU,
+        "explicit CPU must resolve to CPU");
+}
+GST_END_TEST
+
+// The accel control API: valid selections are accepted on a real pipeline, a
+// bad id is rejected like the rest of the API, and detection is serialisable.
+GST_START_TEST(test_accel_api)
+{
+    size_t id = mediaLib_create(SourceType::CAMERA_SOURCE, SinkType::APPLICATION_SINK, "t_accel");
+    for (int sel = 0; sel <= 3; ++sel)          // AUTO, CPU, VULKAN, CUDA
+        fail_unless(mediaLib_setAccel(id, sel) == errorState::NO_ERR,
+            "selection %d must be accepted", sel);
+    fail_unless(mediaLib_setAccel(9999, 0) == errorState::NULLPTR_ERR,
+        "a bad pipeline id must be rejected");
+
+    const std::string listing = mediaLib_detectAccelerators();
+    fail_unless(listing.find("backend=cpu") != std::string::npos,
+        "detection listing must include cpu, got '%s'", listing.c_str());
+
+    mediaLib_delete(id);
+}
+GST_END_TEST
+
 Suite* inference_suite()
 {
     Suite* s = suite_create("inference");
@@ -163,5 +226,8 @@ Suite* inference_suite()
     tcase_add_test(tc, test_params_without_model_and_stats_absent);
     tcase_add_test(tc, test_model_registry_entries_are_resolvable);
     tcase_add_test(tc, test_detector_runs_when_a_model_is_installed);
+    tcase_add_test(tc, test_accelerators_detection_invariants);
+    tcase_add_test(tc, test_resolve_backend_is_always_runnable);
+    tcase_add_test(tc, test_accel_api);
     return s;
 }
