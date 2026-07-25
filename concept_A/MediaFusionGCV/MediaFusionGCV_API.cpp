@@ -4,9 +4,14 @@
 #include "ModelRegistry.h"
 #include "AcceleratorRegistry.h"
 
+#include <opencv2/core.hpp>
+
+#include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 
@@ -14,9 +19,38 @@
 std::vector<PipelineManager*> pipelines;
 
 
+// How many cores OpenCV's internal pool may use. Left alone, OpenCV takes every
+// core for each cv::dnn::forward() — with N cameras running that is N*cores
+// runnable threads on `cores` cores, and the losers are the v4l2 capture threads,
+// which must never stall or the driver drops frames. Inference is already
+// asynchronous and frame-skipping (see DetectorAlgorithm), so it does not need
+// the whole machine; it needs to not evict capture. A quarter of the cores is the
+// default; MEDIAFUSION_CV_THREADS overrides it for benchmarking (0 = OpenCV's
+// own default, i.e. no cap).
+static void capOpenCVThreads()
+{
+	int threads = std::clamp(static_cast<int>(std::thread::hardware_concurrency()) / 4, 1, 4);
+
+	if (const char* env = std::getenv("MEDIAFUSION_CV_THREADS")) {
+		try {
+			const int requested = std::stoi(env);
+			if (requested > 0)      threads = requested;
+			else if (requested == 0) return;          // explicit opt-out: leave OpenCV alone
+		} catch (...) {
+			std::cerr << "MEDIAFUSION_CV_THREADS='" << env << "' is not a number; ignoring\n";
+		}
+	}
+
+	cv::setNumThreads(threads);
+	std::cerr << "opencv thread pool capped at " << threads << " (of "
+	          << std::thread::hardware_concurrency() << " cores)\n";
+}
+
 errorState mediaLib_GStreamerInit(int argc, char* argv[])
 {
 	gst_init(&argc, &argv);
+
+	capOpenCVThreads();
 
 	// Probe acceleration once, here, so the cost (creating a Vulkan instance to
 	// enumerate devices) is paid at startup and the detected set is ready for the
