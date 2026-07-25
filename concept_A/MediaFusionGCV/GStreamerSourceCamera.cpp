@@ -1,5 +1,46 @@
 #include "GStreamerSourceCamera.h"
 
+namespace {
+
+// Capture formats the pipeline can consume. video/x-raw goes straight through;
+// image/jpeg (MJPEG) is decoded by the stage setCapsFilterElement() splices in.
+//
+// MJPEG matters for multi-camera work far more than it looks: a 1280x720 YUYV
+// stream is ~55 MB/s (~440 Mbit/s) on the wire, so two cameras cannot both fit
+// on one USB 2.0 bus (480 Mbit/s shared) and the second one is starved of
+// bandwidth by the UVC driver — which surfaces as heavy frame drops on camera 2.
+// The same modes in MJPEG are an order of magnitude smaller and fit comfortably.
+bool isSupportedMediaType(const char* mediaType)
+{
+    return g_strcmp0(mediaType, "video/x-raw") == 0
+        || g_strcmp0(mediaType, "image/jpeg")  == 0;
+}
+
+// Decoders tried, in order, for an MJPEG capture format.
+//
+// jpegdec (libjpeg-turbo) is first on purpose: it decodes into system memory,
+// which is what both the in-place BGR pad probe and unixfdsink's memfd allocator
+// need. vajpegdec would decode on the AMD GPU but hands back VA memory, and the
+// GL download path on this stack is the one that produced all-black frames
+// before (see accelSegmentFactories in PipelineManager.cpp) — worth revisiting
+// in a session that can validate it against a real camera.
+const char* const kJpegDecoders[] = { "jpegdec", "avdec_mjpeg" };
+
+GstElement* makeJpegDecoder()
+{
+    for (const char* factory : kJpegDecoders) {
+        if (GstElement* e = gst_element_factory_make(factory, "src-decoder")) {
+            std::cerr << "capture: MJPEG selected, decoding with " << factory << "\n";
+            return e;
+        }
+    }
+    std::cerr << "capture: MJPEG selected but no JPEG decoder is installed "
+                 "(tried jpegdec, avdec_mjpeg)\n";
+    return nullptr;
+}
+
+} // namespace
+
 GStreamerSourceCamera::GStreamerSourceCamera()
 {
 #ifdef  _WIN32
@@ -29,7 +70,9 @@ errorState GStreamerSourceCamera::getSourceDevices()
     if (!monitor)
         return errorState::CREATE_DEVICE_MONITOR_ERR;
 
-    GstCaps* caps = gst_caps_new_empty_simple("video/x-raw");
+    GstCaps* caps = gst_caps_new_empty();
+    gst_caps_append_structure(caps, gst_structure_new_empty("video/x-raw"));
+    gst_caps_append_structure(caps, gst_structure_new_empty("image/jpeg"));
     gst_device_monitor_add_filter(monitor, "Video/Source", caps);
     gst_caps_unref(caps);
 
@@ -82,7 +125,7 @@ void GStreamerSourceCamera::addDevicePropertie(const std::string& deviceName,
     guint total = deviceCaps ? gst_caps_get_size(deviceCaps) : 0;
     for (guint i = 0; i < total; ++i) {
         const GstStructure* s = gst_caps_get_structure(deviceCaps, i);
-        if (!s || g_strcmp0(gst_structure_get_name(s), "video/x-raw") != 0)
+        if (!s || !isSupportedMediaType(gst_structure_get_name(s)))
             continue;
         // Skip modes the CPU pipeline cannot negotiate: structures carrying a
         // special memory feature (PipeWire's memory:DMABuf with format=DMA_DRM)
@@ -216,6 +259,27 @@ errorState GStreamerSourceCamera::setCapsFilterElement(int32_t deviceId, int32_t
     GstCaps* capsPtr = gst_caps_from_string(caps.c_str());
     if (!capsPtr)
         return errorState::OBJECT_CREATION_ERR;
+
+    // An encoded format needs a decoder in the chain and a raw one must not have
+    // it, so the decision is rebuilt from scratch on every selection — switching
+    // a slot from MJPEG back to YUYV drops the decoder again. Only safe while the
+    // element is not yet in the pipeline bin, which is the case for the whole
+    // configure-then-start sequence the API expects.
+    const GstStructure* chosen  = gst_caps_get_structure(capsPtr, 0);
+    const bool          encoded = chosen
+                               && g_strcmp0(gst_structure_get_name(chosen), "image/jpeg") == 0;
+
+    if (decoder && !GST_OBJECT_PARENT(decoder)) {
+        gst_object_unref(decoder);
+        decoder = nullptr;
+    }
+    if (encoded && !decoder) {
+        decoder = makeJpegDecoder();
+        if (!decoder) {
+            gst_caps_unref(capsPtr);
+            return errorState::OBJECT_CREATION_ERR;
+        }
+    }
 
     g_object_set(capsFilter, "caps", capsPtr, NULL);
     gst_caps_unref(capsPtr);

@@ -77,7 +77,9 @@ GST_END_TEST
 
 // PipeWire devices list DMABuf/DMA_DRM modes the CPU pipeline cannot use —
 // they must not appear in the capture-mode list (selecting one, e.g. the
-// multi-grid tiles' default cap 0, failed start with BUILD_PIPELINE_FAILED)
+// multi-grid tiles' default cap 0, failed start with BUILD_PIPELINE_FAILED).
+// MJPEG modes, by contrast, MUST survive: they are the only way two cameras
+// fit on one USB bus, and a decoder is spliced in for them at selection time.
 GST_START_TEST(test_dma_drm_modes_filtered)
 {
     GStreamerSourceCamera cam;
@@ -94,11 +96,53 @@ GST_START_TEST(test_dma_drm_modes_filtered)
 
     fail_unless(cam.devicesContainer.size() == before + 1, "device was not added");
     const auto* dev = cam.devicesContainer.back();
-    fail_unless(gst_caps_get_size(dev->deviceCapabilities) == 1,
-        "expected exactly 1 usable cap, got %u", gst_caps_get_size(dev->deviceCapabilities));
+    fail_unless(gst_caps_get_size(dev->deviceCapabilities) == 2,
+        "expected the YUY2 and MJPEG caps to survive, got %u",
+        gst_caps_get_size(dev->deviceCapabilities));
+
     const GstStructure* s0 = gst_caps_get_structure(dev->deviceCapabilities, 0);
     fail_unless(g_strcmp0(gst_structure_get_string(s0, "format"), "YUY2") == 0,
-        "surviving cap is not the YUY2 mode");
+        "first surviving cap is not the YUY2 mode");
+    const GstStructure* s1 = gst_caps_get_structure(dev->deviceCapabilities, 1);
+    fail_unless(g_strcmp0(gst_structure_get_name(s1), "image/jpeg") == 0,
+        "second surviving cap is not the MJPEG mode");
+}
+GST_END_TEST
+
+// Selecting an MJPEG capture mode must put a decoder in the chain, and going
+// back to a raw mode must take it out again.
+GST_START_TEST(test_mjpeg_cap_creates_decoder)
+{
+    GStreamerSourceCamera cam;
+    const size_t devIndex = cam.devicesContainer.size();
+
+    // setCapsFilterElement needs the capsfilter PipelineManager normally owns.
+    // The base destructor unrefs it, same as for a real pipeline.
+    cam.capsFilter = gst_element_factory_make("capsfilter", nullptr);
+    fail_unless(cam.capsFilter != nullptr, "capsfilter unavailable");
+
+    GstCaps* caps = gst_caps_from_string(
+        "video/x-raw, format=(string)YUY2, width=640, height=480, framerate=30/1; "
+        "image/jpeg, width=1920, height=1080, framerate=30/1");
+    fail_unless(caps != nullptr, "test caps failed to parse");
+    cam.addDevicePropertie("FakeCam", caps, nullptr);
+    gst_caps_unref(caps);
+
+    // The override is private on the camera; the interface is public on the base,
+    // which is how PipelineManager reaches it too.
+    GStreamerSource& src = cam;
+
+    errorState r = src.setCapsFilterElement(static_cast<int32_t>(devIndex), 0);
+    fail_unless(r == errorState::NO_ERR, "selecting the raw cap failed: %d", (int)r);
+    fail_unless(cam.decoder == nullptr, "a raw cap must not add a decoder");
+
+    r = src.setCapsFilterElement(static_cast<int32_t>(devIndex), 1);
+    fail_unless(r == errorState::NO_ERR, "selecting the MJPEG cap failed: %d", (int)r);
+    fail_unless(cam.decoder != nullptr, "an MJPEG cap must add a decoder");
+
+    r = src.setCapsFilterElement(static_cast<int32_t>(devIndex), 0);
+    fail_unless(r == errorState::NO_ERR, "reselecting the raw cap failed: %d", (int)r);
+    fail_unless(cam.decoder == nullptr, "switching back to raw must drop the decoder");
 }
 GST_END_TEST
 
@@ -113,6 +157,7 @@ Suite* device_enumeration_suite()
     tcase_add_test(tc, test_setdevice_oob_device_id);
     tcase_add_test(tc, test_setdevice_oob_cap_index);
     tcase_add_test(tc, test_dma_drm_modes_filtered);
+    tcase_add_test(tc, test_mjpeg_cap_creates_decoder);
     suite_add_tcase(s, tc);
     return s;
 }

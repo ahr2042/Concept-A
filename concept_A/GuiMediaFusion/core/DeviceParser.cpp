@@ -28,6 +28,14 @@ QString firstFraction(QString v)
     return QString::number(num / den, 'g', 4);
 }
 
+// The "Cap [N]: <media type>" header line the daemon prints for each cap.
+QString mediaType(const QString& block)
+{
+    const QRegularExpression re(QStringLiteral("^Cap \\[\\d+\\]: (\\S+)"));
+    const auto m = re.match(block);
+    return m.hasMatch() ? m.captured(1) : QString();
+}
+
 QString makeLabel(int index, const QString& block)
 {
     const QString w  = field(block, QStringLiteral("width"));
@@ -35,6 +43,12 @@ QString makeLabel(int index, const QString& block)
     QString fmt      = field(block, QStringLiteral("format"));
     fmt.remove('"');
     const QString fps = firstFraction(field(block, QStringLiteral("framerate")));
+
+    // An encoded mode carries no "format" field — its identity is the media
+    // type. Name it, so MJPEG and raw modes at the same geometry are tellable
+    // apart in the picker (they are very different in USB bandwidth).
+    if (fmt.isEmpty() && mediaType(block) == QStringLiteral("image/jpeg"))
+        fmt = QStringLiteral("MJPEG");
 
     QString label;
     if (!w.isEmpty() && !h.isEmpty())
