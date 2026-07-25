@@ -3,7 +3,9 @@
 GStreamerSource::~GStreamerSource()
 {
     if (sourceElement) { gst_object_unref(sourceElement); sourceElement = nullptr; }
+    if (queue)         { gst_object_unref(queue);         queue         = nullptr; }
     if (capsFilter)    { gst_object_unref(capsFilter);    capsFilter    = nullptr; }
+    if (decoder)       { gst_object_unref(decoder);       decoder       = nullptr; }
     if (converter)     { gst_object_unref(converter);     converter     = nullptr; }
 }
 

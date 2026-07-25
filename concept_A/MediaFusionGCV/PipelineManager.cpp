@@ -33,8 +33,27 @@ PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const cha
     }
 
     if (source) {
+        source->queue      = gst_element_factory_make("queue",        "src-queue");
         source->capsFilter = gst_element_factory_make("capsfilter",   "src-capsfilter");
         source->converter  = gst_element_factory_make("videoconvert", "src-converter");
+
+        if (source->queue) {
+            // Three frames is enough to ride out a scheduling spike without
+            // adding visible latency (~100 ms at 30 fps). Bound on buffers only:
+            // the byte and time limits would otherwise trip first and block the
+            // capture thread, which is exactly what this queue exists to prevent.
+            g_object_set(source->queue,
+                "max-size-buffers", 3,
+                "max-size-bytes",   0,
+                "max-size-time",    static_cast<guint64>(0),
+                "leaky",            2,        // GST_QUEUE_LEAK_DOWNSTREAM: drop oldest
+                NULL);
+        }
+        if (source->converter) {
+            // n-threads defaults to 1, so the (per-camera) colourspace convert is
+            // single-threaded; 0 lets videoconvert scale it across cores.
+            g_object_set(source->converter, "n-threads", 0, NULL);
+        }
     }
 
     if (sink) {
@@ -42,7 +61,8 @@ PipelineManager::PipelineManager(SourceType srcType, SinkType snkType, const cha
     }
 
     if (!pipeline
-        || (source && (!source->sourceElement || !source->capsFilter || !source->converter))
+        || (source && (!source->sourceElement || !source->queue
+                       || !source->capsFilter || !source->converter))
         || (sink   && (!sink->sinkElement || !sink->converter)))
     {
         g_error("Failed to create pipeline elements");
@@ -300,6 +320,7 @@ errorState PipelineManager::buildPipeline()
 
     gst_bin_add_many(GST_BIN(pipeline),
         source->sourceElement,
+        source->queue,
         source->capsFilter,
         source->converter,
         sink->converter,
@@ -310,10 +331,17 @@ errorState PipelineManager::buildPipeline()
     // now holds the only reference.  Add an explicit ref so that source/sink
     // destructors can safely unref their own pointers without a double-free.
     gst_object_ref(source->sourceElement);
+    gst_object_ref(source->queue);
     gst_object_ref(source->capsFilter);
     gst_object_ref(source->converter);
     gst_object_ref(sink->converter);
     gst_object_ref(sink->sinkElement);
+
+    // Present only for an encoded capture format (MJPEG); same ownership rule.
+    if (source->decoder) {
+        gst_bin_add(GST_BIN(pipeline), source->decoder);
+        gst_object_ref(source->decoder);
+    }
 
     if (useProcessor) {
         gst_bin_add_many(GST_BIN(pipeline), processor->filterElement, NULL);
@@ -328,37 +356,40 @@ errorState PipelineManager::buildPipeline()
         m_gpuElements.push_back(e);
     }
 
-    struct LinkStep { GstElement* from; GstElement* to; const char* desc; };
-    std::vector<LinkStep> steps = {
-        { source->sourceElement, source->capsFilter, "source → src-capsfilter" },
+    // The chain in order, skipping the stages this configuration does not use.
+    // Everything is linked pairwise below, so an optional stage is added or left
+    // out in one place instead of branching over every possible link.
+    struct Stage { GstElement* element; const char* name; };
+    std::vector<Stage> chain = {
+        { source->sourceElement, "source"         },
+        { source->queue,         "src-queue"      },
+        { source->capsFilter,    "src-capsfilter" },
     };
 
-    // src-capsfilter → [GPU convert segment] → src-converter. The trailing
-    // videoconvert still guarantees exact BGR/system-memory for the pad probe,
-    // so the unixfdsink memfd contract is untouched whether or not the GPU
-    // segment is present.
-    if (!gpuSeg.empty()) {
-        steps.push_back({ source->capsFilter, gpuSeg.front(), "src-capsfilter → gpu-in" });
-        for (size_t i = 1; i < gpuSeg.size(); ++i)
-            steps.push_back({ gpuSeg[i - 1], gpuSeg[i], "gpu → gpu" });
-        steps.push_back({ gpuSeg.back(), source->converter, "gpu-out → src-converter" });
-    } else {
-        steps.push_back({ source->capsFilter, source->converter, "src-capsfilter → src-converter" });
-    }
+    // Encoded capture (MJPEG) has to be decoded before anything can look at
+    // pixels. Raw formats leave decoder == nullptr and the stage is skipped.
+    if (source->decoder)
+        chain.push_back({ source->decoder, "src-decoder" });
 
-    if (useProcessor) {
-        // Splice the BGR capsfilter in; its src-pad probe processes each buffer
-        // in place (see FrameProcessor), so downstream allocation stays intact.
-        steps.push_back({ source->converter,       processor->filterElement, "src-converter → fp-bgr" });
-        steps.push_back({ processor->filterElement, sink->converter,         "fp-bgr → sink-queue"    });
-    } else {
-        steps.push_back({ source->converter,    sink->converter,        "src-converter → sink-queue" });
-    }
-    steps.push_back({ sink->converter, sink->sinkElement, "sink-queue → sink" });
+    // [GPU convert segment] → src-converter. The trailing videoconvert still
+    // guarantees exact BGR/system-memory for the pad probe, so the unixfdsink
+    // memfd contract is untouched whether or not the GPU segment is present.
+    for (GstElement* e : gpuSeg)
+        chain.push_back({ e, "gpu" });
+    chain.push_back({ source->converter, "src-converter" });
 
-    for (auto& s : steps) {
-        if (!gst_element_link(s.from, s.to)) {
-            std::cerr << "Failed to link: " << s.desc << "\n";
+    // The BGR capsfilter's src-pad probe processes each buffer in place (see
+    // FrameProcessor), so downstream allocation stays intact.
+    if (useProcessor)
+        chain.push_back({ processor->filterElement, "fp-bgr" });
+
+    chain.push_back({ sink->converter,  "sink-queue" });
+    chain.push_back({ sink->sinkElement, "sink"      });
+
+    for (size_t i = 1; i < chain.size(); ++i) {
+        if (!gst_element_link(chain[i - 1].element, chain[i].element)) {
+            std::cerr << "Failed to link: " << chain[i - 1].name
+                      << " → " << chain[i].name << "\n";
             GstCaps* setCaps = nullptr;
             g_object_get(source->capsFilter, "caps", &setCaps, NULL);
             gchar* capsStr = setCaps ? gst_caps_to_string(setCaps) : nullptr;

@@ -40,6 +40,15 @@ public:
     std::string getCapsStringAtIndex(int32_t deviceID, guint index);
 
     GstElement* sourceElement = nullptr;
+    // Decouples capture from everything downstream: the source's streaming task
+    // only dequeues from the driver and pushes here, so a slow colourspace
+    // convert or OpenCV stage can no longer stall the v4l2 buffer queue (which
+    // shows up as driver-level frame drops). Leaky downstream — under load the
+    // oldest frame is dropped rather than latency accumulating.
+    GstElement* queue         = nullptr;
     GstElement* capsFilter    = nullptr;
+    // Only present when the selected capture format is encoded (MJPEG); nullptr
+    // for a raw format, where the source already delivers video/x-raw.
+    GstElement* decoder       = nullptr;
     GstElement* converter     = nullptr;
 };
