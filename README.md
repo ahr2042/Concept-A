@@ -62,11 +62,12 @@ interrupts operations; errors surface as log entries and tile badges.
 | **Daemon control** | `MediaFusionGCV --serve <socket>`: full text protocol (create / devices / set-device / algos / start / stop / delete / list), one connection, serialized commands |
 | **Daemon lifecycle** | Console auto-spawns the daemon if unreachable, restarts it (`REBOOT_CORE`) or shuts it down (`TERMINATE_PID`); crash → status LED + tiles fall back to `NO_SIGNAL` |
 | **Device manager** | Camera enumeration (raw V4L2 and PipeWire providers, same-node twins deduplicated) with per-device caps (resolution / format / framerate) selection; the source element is built from the selected device; only modes the CPU pipeline can negotiate are listed (DMABuf/`DMA_DRM` import is planned) |
+| **Capture formats** | Raw *and* **MJPEG** capture modes, labelled apart in the picker; an encoded mode gets a decoder (`jpegdec`, else `avdec_mjpeg`) spliced into the chain automatically. This is what makes several cameras on one USB bus viable — 720p YUYV is ~55 MB/s, so two of them do not fit on USB 2.0 and the second is starved. On the dev webcam it is also the difference between **1080p at 5 fps (raw, measured 4.5) and 1080p at 30 fps (MJPEG, measured 15.1 under office lighting)** |
 | **Multi-stream** | 2×2 multi-grid, one independent daemon pipeline per tile; a single camera can feed several tiles at once (PipeWire multiplexing) |
 | **Telemetry** | Real per-stream FPS & throughput (sink pad probe); real host telemetry — AMD GPU temperature, VRAM, fan, GPU busy %, CPU package temp (hwmon, 1 Hz) |
 | **Observability** | App-wide event log with level filters and CSV export, including the full control-protocol transcript |
 | **Theming** | Generated QSS from design tokens; runtime accent-hue switching |
-| **Verification** | `gstreamer-check` suite (4 suites, 25 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; GitHub Actions builds, tests and renders every page on each push to `main` |
+| **Verification** | `gstreamer-check` suite (4 suites, 26 tests) + built-in self-tests: offscreen screenshot tour and a full hardware-in-the-loop stream test; `scripts/bench-capture.sh` measures engine throughput for one capture mode; GitHub Actions builds, tests and renders every page on each push to `main` |
 
 ### Planned
 
@@ -106,7 +107,7 @@ flowchart LR
         direction TB
         CTL["--serve control daemon<br/><i>text protocol over UDS</i>"]
         PM["PipelineManager stash"]
-        PIPE["v4l2src → capsfilter →<br/>OpenCV chain (pad probe) →<br/>unixfdsink"]
+        PIPE["v4l2src → queue → capsfilter →<br/>jpegdec (MJPEG modes) → videoconvert →<br/>OpenCV chain (pad probe) → unixfdsink"]
         CTL --- PM --- PIPE
     end
 
@@ -205,7 +206,10 @@ cmake -S concept_A/GuiMediaFusion -B concept_A/GuiMediaFusion/build
 cmake --build concept_A/GuiMediaFusion/build -j
 ```
 
-Binaries land in `concept_A/x64_debug/`.
+Binaries land in `concept_A/x64_debug/`. Both trees default to `RelWithDebInfo`
+(optimized, full symbols) — the per-frame code is this project's own, so an
+unoptimized build costs real frame rate. Pass `-DCMAKE_BUILD_TYPE=Debug` when you
+need to step through locals that optimization folds away.
 
 ### Run
 
@@ -236,14 +240,21 @@ QT_QPA_PLATFORM=offscreen ./concept_A/x64_debug/GUIMediaFusion --selftest-screen
 # Full hardware-in-the-loop check: daemon → camera → zero-copy socket → viewport,
 # exits 0 once frames are flowing
 ./concept_A/x64_debug/GUIMediaFusion --selftest-stream
+
+# Engine throughput for one capture mode (frames/s and drops, console not involved)
+scripts/bench-capture.sh 0 "1080p MJPEG"
 ```
+
+Measured numbers, the open performance work and the pipeline invariants that look
+like optimizations but break streaming live in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ## Repository layout
 
 ```
 concept_A/
 ├── MediaFusionGCV/          # engine: library, daemon/REPL executable, tests
-│   ├── PipelineManager.*    #   pipeline lifecycle, GMainLoop thread
+│   ├── PipelineManager.*    #   pipeline lifecycle, bus-polling thread
 │   ├── FrameProcessor.*     #   in-place OpenCV chain (pad probe)
 │   ├── Algorithms.*         #   Algorithm interface + factory (grayscale, canny, detect)
 │   ├── Detector.*           #   ONNX object detection on a worker thread
@@ -261,9 +272,12 @@ concept_A/
 models/                      # detector weights (gitignored, see scripts/)
 scripts/
 ├── build-opencv.sh          # OpenCV 4.8+ into ~/.local (apt's 4.6 is too old)
-└── fetch-models.sh          # yolov5n.onnx + COCO labels
+├── build-ncnn.sh            # ncnn + Vulkan into ~/.local (enables -DWITH_GPU)
+├── fetch-models.sh          # yolov5n.onnx + COCO labels, converted for ncnn
+└── bench-capture.sh         # engine throughput for one capture mode
 docs/
 ├── GUI_DESIGN.md            # console software design & design→engine feature matrix
+├── PERFORMANCE.md           # measured baselines, open optimizations, pipeline invariants
 ├── stitch/                  # browsable HTML design mockups (Stitch)
 └── screenshots/             # the images in this README
 ```
