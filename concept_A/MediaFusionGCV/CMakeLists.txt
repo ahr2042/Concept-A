@@ -4,6 +4,18 @@ project(MediaFusionGCV VERSION 2.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Default to an optimized build. With no build type CMake passes no -O flag at
+# all, and the hottest code in this project is its own: the per-frame pad probe
+# and parseYoloOutput's scan over ~25k anchors per inference. RelWithDebInfo
+# keeps full symbols, so the debugger still works; pass -DCMAKE_BUILD_TYPE=Debug
+# explicitly when stepping through optimised-away locals is a problem.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+                 Debug Release RelWithDebInfo MinSizeRel)
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 find_package(PkgConfig REQUIRED)
 
 pkg_search_module(gstreamer       REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.4)
