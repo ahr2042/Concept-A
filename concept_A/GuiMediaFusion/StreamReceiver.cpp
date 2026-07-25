@@ -26,10 +26,12 @@ bool StreamReceiver::start(const std::string& socketPath)
     // rather than accumulating delay; sync=false renders frames as they arrive.
     // glimagesink = GPU path via Mesa GL — swap for waylandsink / xvimagesink to
     // match the session if you prefer.
+    // videoconvert n-threads defaults to 1; 0 spreads the per-tile convert
+    // across cores, which matters once several tiles are live at once.
     const std::string desc =
         "unixfdsrc socket-path=" + socketPath + " ! "
         "queue max-size-buffers=3 leaky=downstream ! "
-        "videoconvert ! "
+        "videoconvert n-threads=0 ! "
         "glimagesink name=videosink sync=false";
 
     GError* err = nullptr;
