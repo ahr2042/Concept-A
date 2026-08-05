@@ -218,6 +218,55 @@ GST_START_TEST(test_param_api_bounds_checks)
 }
 GST_END_TEST
 
+// framediff is the first stage that carries state between frames: a still scene
+// must read as still, and something that moves must light up where it moved.
+GST_START_TEST(test_framediff_reports_motion_only_where_it_happened)
+{
+    auto motion = makeAlgorithm("framediff");
+    fail_unless(motion != nullptr, "framediff must be registered");
+
+    // Mask mode, so the result is exactly "what moved" with nothing blended in.
+    motion->setParams({ { "mode", 1.0 }, { "sensitivity", 75.0 } });
+
+    const cv::Scalar background(30, 60, 90);
+    const cv::Rect   startsAt(20, 20, 30, 30);
+    const cv::Rect   movesTo(100, 60, 30, 30);
+
+    cv::Mat frame(120, 160, CV_8UC3, background);
+    cv::rectangle(frame, startsAt, cv::Scalar(240, 240, 240), -1);
+
+    // First frame only seeds the background model — nothing has moved yet.
+    motion->apply(frame);
+
+    // A still scene: feed the same frame again and expect an empty mask.
+    cv::Mat still(120, 160, CV_8UC3, background);
+    cv::rectangle(still, startsAt, cv::Scalar(240, 240, 240), -1);
+    motion->apply(still);
+    cv::Mat stillGray;
+    cv::cvtColor(still, stillGray, cv::COLOR_BGR2GRAY);
+    fail_unless(cv::countNonZero(stillGray) == 0,
+        "a still scene reported %d moving pixels", cv::countNonZero(stillGray));
+
+    // Now move the block. Both the vacated and the newly covered area differ
+    // from the model, so both should register.
+    cv::Mat moved(120, 160, CV_8UC3, background);
+    cv::rectangle(moved, movesTo, cv::Scalar(240, 240, 240), -1);
+    motion->apply(moved);
+
+    cv::Mat movedGray;
+    cv::cvtColor(moved, movedGray, cv::COLOR_BGR2GRAY);
+    fail_unless(cv::countNonZero(movedGray(movesTo)) > 0,
+        "no motion reported where the block moved to");
+    fail_unless(cv::countNonZero(movedGray(startsAt)) > 0,
+        "no motion reported where the block moved from");
+
+    // ... and nowhere else: a corner the block never touched must stay clear.
+    const cv::Rect untouched(130, 95, 25, 20);
+    fail_unless(cv::countNonZero(movedGray(untouched)) == 0,
+        "motion reported in a region nothing moved through");
+}
+GST_END_TEST
+
 Suite* algorithms_suite()
 {
     Suite*   s  = suite_create("algorithms");
@@ -231,5 +280,6 @@ Suite* algorithms_suite()
     tcase_add_test(tc, test_canny_thresholds_are_tunable);
     tcase_add_test(tc, test_params_survive_a_chain_rebuild);
     tcase_add_test(tc, test_param_api_bounds_checks);
+    tcase_add_test(tc, test_framediff_reports_motion_only_where_it_happened);
     return s;
 }

@@ -99,9 +99,100 @@ private:
     double m_high = 160.0;
 };
 
+// Motion by temporal difference against a running average of the scene.
+//
+// The cheapest useful motion stage, and the reference the heavier subtractors
+// are judged against: one grayscale conversion, one absdiff, one threshold and
+// one accumulate per frame, all single-channel. The running average is what
+// makes it more than a naive frame-to-frame diff — a parked object fades into
+// the background over a few seconds instead of flickering forever, and slow
+// lighting drift is absorbed rather than reported as motion.
+//
+// This is the first stage that keeps state across frames. The state is per
+// instance and FrameProcessor gives every chain its own objects, so two cameras
+// never share a background model.
+class FrameDiffAlgorithm : public Algorithm
+{
+public:
+    const char* name() const override { return "framediff"; }
+
+    void setParams(const AlgorithmParams& p) override
+    {
+        readParam(p, "sensitivity", m_sensitivity);
+        readParam(p, "decay", m_decay);
+        readParam(p, "mode", m_mode);
+    }
+
+    void apply(cv::Mat& frame) override
+    {
+        cv::Mat gray;
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+
+        // First frame, or a geometry change: seed the model and report nothing.
+        // There is no "previous" to difference against, and claiming the whole
+        // frame moved would blind the operator for a frame.
+        if (m_background.empty() || m_background.size() != gray.size()) {
+            gray.convertTo(m_background, CV_32FC1);
+            return;
+        }
+
+        cv::Mat reference, diff;
+        m_background.convertTo(reference, CV_8UC1);
+        cv::absdiff(gray, reference, diff);
+
+        // Update before rendering, so the cost is paid whichever mode is on and
+        // the model keeps adapting even while the operator is looking at a mask.
+        cv::accumulateWeighted(gray, m_background, m_decay);
+
+        switch (static_cast<int>(m_mode)) {
+            case 1: {   // mask — what the later motion stages will threshold
+                cv::Mat mask;
+                cv::threshold(diff, mask, pixelThreshold(), 255.0, cv::THRESH_BINARY);
+                cv::cvtColor(mask, frame, cv::COLOR_GRAY2BGR);
+                break;
+            }
+            case 2:     // heat — raw difference magnitude, no threshold at all
+                cv::applyColorMap(diff, frame, cv::COLORMAP_INFERNO);
+                break;
+            default: {  // overlay — tint the moving pixels, keep the scene
+                cv::Mat mask;
+                cv::threshold(diff, mask, pixelThreshold(), 255.0, cv::THRESH_BINARY);
+                // Blend rather than paint: a solid fill hides what moved, which
+                // is the thing the operator is trying to look at.
+                cv::Mat tinted = frame.clone();
+                tinted.setTo(cv::Scalar(0, 0, 255), mask);
+                cv::addWeighted(tinted, 0.45, frame, 0.55, 0.0, frame);
+                break;
+            }
+        }
+    }
+
+private:
+    // Sensitivity reads the operator's way round — higher finds smaller changes
+    // — so it is the inverse of the pixel threshold it drives.
+    double pixelThreshold() const { return 101.0 - m_sensitivity; }
+
+    cv::Mat m_background;               // CV_32FC1 running average
+    double  m_sensitivity = 75.0;
+    double  m_decay       = 0.05;
+    double  m_mode        = 0.0;
+};
+
 std::vector<AlgorithmParam> noParams()
 {
     return {};
+}
+
+std::vector<AlgorithmParam> frameDiffParams()
+{
+    return {
+        { "sensitivity", "SENSITIVITY", AlgorithmParam::Type::Int, 1.0, 100.0, 1.0, 75.0, {} },
+        // How fast the background forgets. 0.05 at 20 fps means a still object
+        // is absorbed in roughly a second; lower holds the scene longer.
+        { "decay", "BACKGROUND DECAY", AlgorithmParam::Type::Float, 0.001, 0.5, 0.001, 0.05, {} },
+        { "mode", "RENDER MODE", AlgorithmParam::Type::Enum, 0.0, 2.0, 1.0, 0.0,
+          { "overlay", "mask", "heat" } },
+    };
 }
 
 std::vector<AlgorithmParam> cannyParams()
@@ -128,6 +219,10 @@ const std::vector<AlgorithmInfo>& algorithmRegistry()
         { "canny", "Canny edge map with tunable hysteresis thresholds",
           &cannyParams,
           [] { return std::unique_ptr<Algorithm>(new CannyEdgesAlgorithm()); } },
+
+        { "framediff", "Motion by difference against a running average of the scene",
+          &frameDiffParams,
+          [] { return std::unique_ptr<Algorithm>(new FrameDiffAlgorithm()); } },
 
         // Starts idle; FrameProcessor hands it the selected model right after.
         // Its model and thresholds travel on the dedicated `model` /
