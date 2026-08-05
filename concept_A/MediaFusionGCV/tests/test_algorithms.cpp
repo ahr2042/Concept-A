@@ -169,9 +169,13 @@ GST_START_TEST(test_canny_thresholds_are_tunable)
     fail_unless(mediaLib_setAlgorithmParams(id, "nosuch", "low=1") == errorState::INVALID_ARGS_ERR,
         "an unknown algorithm must be rejected");
 
-    // A parameterless stage has an empty schema but is still a valid target.
-    fail_unless(std::string(mediaLib_algorithmParams("grayscale")).empty(),
-        "grayscale declares no parameters");
+    // A parameterless stage still describes itself — it reports a summary and no
+    // knobs, which is not the same as an unknown algorithm reporting nothing.
+    const std::string grayscale = mediaLib_algorithmParams("grayscale");
+    fail_unless(grayscale.find("key=") == std::string::npos,
+        "grayscale declares no parameters, got '%s'", grayscale.c_str());
+    fail_unless(grayscale.find("summary=") != std::string::npos,
+        "every registered algorithm describes itself, got '%s'", grayscale.c_str());
 
     mediaLib_delete(id);
 }

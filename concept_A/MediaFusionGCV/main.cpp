@@ -244,8 +244,15 @@ static std::string handleCommand(const std::string& line)
             out << "ERR INVALID_ARGS algo-params <algo>\n";
         else {
             const std::string schema = mediaLib_algorithmParams(algo.c_str());
-            const size_t      lines  = std::count(schema.begin(), schema.end(), '\n');
-            out << "OK " << lines << " param(s)\n" << schema;
+            // Count the knobs, not the lines: the reply also carries a summary=
+            // line, and a stage with no parameters still has one.
+            size_t             params = 0;
+            std::istringstream lines(schema);
+            std::string        line;
+            while (std::getline(lines, line))
+                if (line.rfind("key=", 0) == 0)
+                    ++params;
+            out << "OK " << params << " param(s)\n" << schema;
         }
     }
     else if (cmd == "algo-set") {
