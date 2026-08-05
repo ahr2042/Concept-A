@@ -30,13 +30,19 @@ if [ ! -d "$WORKDIR/opencv/.git" ]; then
         https://github.com/opencv/opencv.git "$WORKDIR/opencv"
 fi
 
-# Only the modules the detector needs. Trimming the module list (no gapi, no
+# Only the modules the engine needs. Trimming the module list (no gapi, no
 # python/java bindings, no videoio/highgui — GStreamer is the engine's job, not
-# OpenCV's) takes the build from ~40 minutes to under ten.
+# OpenCV's) keeps the build far below the ~40 minutes a full one costs.
+#
+# video     — background subtraction (MOG2/KNN) and optical flow, for the motion
+#             algorithms in the processing chain
+# objdetect — the YuNet face detector the privacy/blur stage uses
+# BUILD_LIST pulls each module's dependencies in on its own, so this also brings
+# calib3d/features2d/flann along.
 cmake -S "$WORKDIR/opencv" -B "$WORKDIR/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
-    -DBUILD_LIST=core,imgproc,imgcodecs,dnn \
+    -DBUILD_LIST=core,imgproc,imgcodecs,dnn,video,objdetect \
     -DOPENCV_GENERATE_PKGCONFIG=ON \
     -DBUILD_SHARED_LIBS=ON \
     -DBUILD_TESTS=OFF \

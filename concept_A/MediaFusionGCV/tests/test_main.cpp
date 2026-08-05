@@ -4,6 +4,7 @@ extern Suite* api_null_safety_suite();
 extern Suite* pipeline_lifecycle_suite();
 extern Suite* device_enumeration_suite();
 extern Suite* inference_suite();
+extern Suite* algorithms_suite();
 
 int main(int argc, char** argv)
 {
@@ -13,6 +14,7 @@ int main(int argc, char** argv)
     srunner_add_suite(sr, pipeline_lifecycle_suite());
     srunner_add_suite(sr, device_enumeration_suite());
     srunner_add_suite(sr, inference_suite());
+    srunner_add_suite(sr, algorithms_suite());
 
     srunner_run_all(sr, CK_NORMAL);
     int failed = srunner_ntests_failed(sr);

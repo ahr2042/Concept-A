@@ -25,6 +25,7 @@ extern "C" {
 		START_STREAMING_FAILED,
 		STOP_STREAMING_FAILED,
 		LOAD_MODEL_ERR,
+		INVALID_ARGS_ERR,
 		NO_ERR
 	};
 #ifdef __cplusplus

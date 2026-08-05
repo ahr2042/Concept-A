@@ -47,6 +47,7 @@ static std::string errStr(errorState e)
         case errorState::START_STREAMING_FAILED:    return "START_STREAMING_FAILED";
         case errorState::STOP_STREAMING_FAILED:     return "STOP_STREAMING_FAILED";
         case errorState::LOAD_MODEL_ERR:            return "LOAD_MODEL_ERR";
+        case errorState::INVALID_ARGS_ERR:          return "INVALID_ARGS";
         case errorState::SET_SOURCE_ELEMENT_ERR:    return "SET_SOURCE_ELEMENT_ERR";
         case errorState::SET_SINK_ELEMENT_ERR:      return "SET_SINK_ELEMENT_ERR";
         case errorState::SET_SOURCE_CAPS_ERR:       return "SET_SOURCE_CAPS_ERR";
@@ -115,6 +116,9 @@ static std::string helpText()
         << "  set-device <id> <dev> <cap>      Select Device [dev] Cap [cap] from 'devices' output\n"
         << "  algos <id> <csv>                 Set OpenCV algorithm chain (empty csv disables)\n"
         << "  algos-list                       List available algorithm names\n"
+        << "  algo-params <algo>               Describe an algorithm's tunable parameters\n"
+        << "  algo-set <id> <algo> <k=v,k=v>   Tune an algorithm (e.g. algo-set 0 canny low=90)\n"
+        << "  algo-get <id> <algo>             Show an algorithm's current parameter values\n"
         << "  accelerators                     List detected accel backends (cpu/vulkan/cuda)\n"
         << "  models                           List installed detector models\n"
         << "  model <id> [name]                Load a detector model (no name unloads it)\n"
@@ -231,6 +235,53 @@ static std::string handleCommand(const std::string& line)
     }
     else if (cmd == "algos-list") {
         out << "OK " << mediaLib_availableAlgorithms() << "\n";
+    }
+    else if (cmd == "algo-params") {
+        // Schema only — no pipeline needed, so a client can build its controls
+        // before anything is created.
+        std::string algo;
+        if (!(iss >> algo))
+            out << "ERR INVALID_ARGS algo-params <algo>\n";
+        else {
+            const std::string schema = mediaLib_algorithmParams(algo.c_str());
+            // Count the knobs, not the lines: the reply also carries a summary=
+            // line, and a stage with no parameters still has one.
+            size_t             params = 0;
+            std::istringstream lines(schema);
+            std::string        line;
+            while (std::getline(lines, line))
+                if (line.rfind("key=", 0) == 0)
+                    ++params;
+            out << "OK " << params << " param(s)\n" << schema;
+        }
+    }
+    else if (cmd == "algo-set") {
+        size_t      id = 0;
+        std::string algo;
+        if (!(iss >> id >> algo))
+            out << "ERR INVALID_ARGS algo-set <id> <algo> <k=v,k=v>\n";
+        else {
+            std::string kv;
+            std::getline(iss, kv);                        // rest of line
+            size_t a = kv.find_first_not_of(" \t");
+            kv = (a == std::string::npos) ? "" : kv.substr(a);
+            errorState err = mediaLib_setAlgorithmParams(id, algo.c_str(), kv.c_str());
+            if (err == errorState::NO_ERR)
+                out << "OK\n";
+            else {
+                out << "ERR " << errStr(err) << "\n";
+                if (err == errorState::INVALID_ARGS_ERR)
+                    out << "  hint: run 'algo-params " << algo << "' for the keys and ranges\n";
+            }
+        }
+    }
+    else if (cmd == "algo-get") {
+        size_t      id = 0;
+        std::string algo;
+        if (!(iss >> id >> algo))
+            out << "ERR INVALID_ARGS algo-get <id> <algo>\n";
+        else
+            out << "OK " << mediaLib_getAlgorithmParams(id, algo.c_str()) << "\n";
     }
     else if (cmd == "accelerators") {
         // One line per backend the host can run; the GUI shows only available=1.

@@ -329,15 +329,55 @@ void DashboardPage::onAlgorithms(const QStringList& algos)
         delete item;
     }
     m_algoBoxes.clear();
+    m_algoPanels.clear();
     if (algos.isEmpty()) {
         host->layout()->addWidget(new QLabel(QStringLiteral("no algorithms reported"), host));
         return;
     }
     for (const QString& a : algos) {
         auto* cb = new QCheckBox(a.toUpper(), host);
+        cb->setToolTip(m_service->algorithmSummary(a));
         m_algoBoxes.append(cb);
         host->layout()->addWidget(cb);
+
+        // Controls for whatever knobs this algorithm declares, hidden until the
+        // stage is actually selected so the panel does not fill with sliders
+        // for stages that are switched off.
+        const QVector<AlgorithmParamSpec> schema = m_service->algorithmParams(a);
+        if (schema.isEmpty())
+            continue;
+
+        auto* panel = new vos::ParamPanel(a, schema, host);
+        panel->setVisible(false);
+        connect(cb, &QCheckBox::toggled, panel, &QWidget::setVisible);
+        connect(panel, &vos::ParamPanel::changed, this, &DashboardPage::onAlgorithmParamsChanged);
+        m_algoPanels.insert(a, panel);
+        host->layout()->addWidget(panel);
     }
+}
+
+// A knob moved. On a live session push it straight through; otherwise it is
+// picked up by the next deploy, which carries the whole map.
+void DashboardPage::onAlgorithmParamsChanged(const QString& algo, const QVariantMap& values)
+{
+    if (m_sessionId >= 0)
+        m_service->setAlgorithmParams(m_sessionId, algo, values);
+}
+
+// Values for every algorithm currently ticked — an unticked stage is not in the
+// chain, so sending its tuning would be noise.
+AlgorithmSettings DashboardPage::algoParams() const
+{
+    AlgorithmSettings out;
+    for (QCheckBox* cb : m_algoBoxes) {
+        if (!cb->isChecked())
+            continue;
+        const QString algo  = cb->text().toLower();
+        auto*         panel = m_algoPanels.value(algo, nullptr);
+        if (panel)
+            out.insert(algo, panel->values());
+    }
+    return out;
 }
 
 void DashboardPage::onModels(const QVector<DetectorModel>& models)
@@ -440,6 +480,7 @@ void DashboardPage::onStart()
     spec.deviceIndex = m_deviceBox->currentData().toInt();
     spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
     spec.algosCsv    = algosCsv();
+    spec.algoParams  = algoParams();
     spec.name        = QStringLiteral("dashboard");
     if (m_modelBox->isEnabled()) {
         spec.detectorModel = m_modelBox->currentData().toString();

@@ -14,6 +14,7 @@
 
 #include <QMetaType>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 struct DetectorModel {
@@ -29,6 +30,23 @@ struct AcceleratorOption {
     QString backend;              // "cpu" / "vulkan" / "cuda"
     QString device;               // human-readable device, "" when none
     bool    available = false;    // usable on this host with this build
+};
+
+// One tunable knob from the daemon's `algo-params <algo>` reply. The console
+// builds a control from the descriptor alone and never has to know which
+// algorithm it belongs to, so a stage added to the engine gets its controls in
+// the UI without a GUI change.
+//
+//   key=low type=int min=0 max=255 step=1 default=80 choices= label=LOW THRESHOLD
+struct AlgorithmParamSpec {
+    QString     key;                  // wire name, what `algo-set` takes
+    QString     label;                // caption
+    QString     type;                 // "int" / "float" / "bool" / "enum"
+    double      min  = 0.0;
+    double      max  = 1.0;
+    double      step = 0.01;
+    double      def  = 0.0;
+    QStringList choices;              // enum only, indexed by the value
 };
 
 struct DetectionBox {
@@ -63,6 +81,12 @@ bool parseStats(const QString& reply, InferenceSnapshot& snapshot);
 // Parses the `accelerators` reply (lines: backend=… available=0|1 device=…).
 // True when the reply started with "OK".
 bool parseAccelerators(const QString& reply, QVector<AcceleratorOption>& out);
+
+// Parses the `algo-params <algo>` reply into the one-line summary and the knob
+// list. True when the reply started with "OK"; an empty list is normal — it
+// means the algorithm has no knobs, which is not the same as it not existing.
+bool parseAlgorithmParams(const QString& reply, QString& summary,
+                          QVector<AlgorithmParamSpec>& out);
 
 } // namespace inferenceparser
 

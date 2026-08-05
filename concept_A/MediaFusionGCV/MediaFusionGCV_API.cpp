@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -203,6 +204,117 @@ const char* mediaLib_availableAlgorithms()
 		csv += n;
 	}
 	return csv.c_str();
+}
+
+// std::to_string always spends six decimals, so an int knob would advertise
+// "max=255.000000". Print the shortest form that round-trips instead.
+static std::string numText(double v)
+{
+	std::ostringstream o;
+	o << v;
+	return o.str();
+}
+
+const char* mediaLib_algorithmParams(const char* algoName)
+{
+	static thread_local std::string listing;
+	listing.clear();
+	if (!algoName)
+		return listing.c_str();
+
+	// What the stage does, on its own line because it reads as prose. A client
+	// shows it as the control's tooltip; it is also how an algorithm with no
+	// knobs still has something to say for itself.
+	const AlgorithmInfo* info = findAlgorithm(algoName);
+	if (!info)
+		return listing.c_str();
+	listing += std::string("summary=") + info->summary + "\n";
+
+	for (const auto& p : algorithmParams(algoName)) {
+		listing += "key=" + p.key;
+		listing += " type=";
+		switch (p.type) {
+			case AlgorithmParam::Type::Int:   listing += "int";   break;
+			case AlgorithmParam::Type::Bool:  listing += "bool";  break;
+			case AlgorithmParam::Type::Enum:  listing += "enum";  break;
+			case AlgorithmParam::Type::Float: listing += "float"; break;
+		}
+		listing += " min="     + numText(p.min);
+		listing += " max="     + numText(p.max);
+		listing += " step="    + numText(p.step);
+		listing += " default=" + numText(p.def);
+		// Pipe-separated so the field stays one whitespace-delimited token.
+		listing += " choices=";
+		for (size_t i = 0; i < p.choices.size(); ++i) {
+			if (i) listing += '|';
+			listing += p.choices[i];
+		}
+		// Label last: it is the only field that may contain spaces, matching
+		// how `stats` puts a detection's label at the end of its line.
+		listing += " label=" + p.label;
+		listing += "\n";
+	}
+	return listing.c_str();
+}
+
+// "low=90,high=200" -> the map. False on a malformed pair or an unparsable
+// number, so a typo is reported rather than silently dropping a knob.
+static bool parseParamCsv(const char* csv, AlgorithmParams& out)
+{
+	if (!csv)
+		return true;
+
+	std::stringstream ss(csv);
+	std::string item;
+	while (std::getline(ss, item, ',')) {
+		size_t a = item.find_first_not_of(" \t");
+		if (a == std::string::npos)
+			continue;                       // tolerate "a=1,,b=2" and trailing commas
+		size_t b = item.find_last_not_of(" \t");
+		item     = item.substr(a, b - a + 1);
+
+		const size_t eq = item.find('=');
+		if (eq == std::string::npos || eq == 0)
+			return false;
+
+		try {
+			size_t consumed = 0;
+			const double value = std::stod(item.substr(eq + 1), &consumed);
+			if (consumed != item.size() - eq - 1)
+				return false;
+			out[item.substr(0, eq)] = value;
+		} catch (const std::exception&) {
+			return false;
+		}
+	}
+	return true;
+}
+
+errorState mediaLib_setAlgorithmParams(size_t pipelineId, const char* algoName, const char* kvCsv)
+{
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
+		return errorState::NULLPTR_ERR;
+	if (!algoName)
+		return errorState::INVALID_ARGS_ERR;
+
+	AlgorithmParams values;
+	if (!parseParamCsv(kvCsv, values))
+		return errorState::INVALID_ARGS_ERR;
+	return pipelines[pipelineId]->setAlgorithmParams(algoName, values);
+}
+
+const char* mediaLib_getAlgorithmParams(size_t pipelineId, const char* algoName)
+{
+	static thread_local std::string listing;
+	listing.clear();
+	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr || !algoName)
+		return listing.c_str();
+
+	for (const auto& [key, value] : pipelines[pipelineId]->algorithmParams(algoName)) {
+		if (!listing.empty()) listing += ',';
+		listing += key + "=" + numText(value);
+	}
+	return listing.c_str();
 }
 
 errorState mediaLib_setDetectorModel(size_t pipelineId, const char* modelNameOrPath)

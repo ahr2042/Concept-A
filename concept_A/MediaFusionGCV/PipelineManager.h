@@ -11,6 +11,7 @@
 #include "errorState.h"
 #include "InferenceStats.h"
 #include "AccelBackend.h"
+#include "AlgorithmParam.h"
 
 #include "GStreamerSource.h"
 #include "GStreamerSink.h"
@@ -43,6 +44,13 @@ public:
     // implies enabling. Algorithm names come from availableAlgorithms().
     void       setProcessingEnabled(bool enabled);
     errorState setAlgorithms(const std::vector<std::string>& names);
+
+    // Tuning for one algorithm, keyed by AlgorithmParam::key (schemas come from
+    // algorithmParams()). Accepted whether or not the stage is currently in the
+    // chain, and replayed when it joins. INVALID_ARGS_ERR for an unknown
+    // algorithm or key; values outside a knob's range are clamped, not refused.
+    errorState      setAlgorithmParams(const std::string& algo, const AlgorithmParams& values);
+    AlgorithmParams algorithmParams(const std::string& algo) const;
 
     // Inference stage — the "detect" algorithm. The model is loaded here and
     // now (not lazily at start) so a bad name or an unreadable graph is

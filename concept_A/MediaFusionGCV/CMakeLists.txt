@@ -59,6 +59,7 @@ set(LIB_SOURCES
     MediaFusionGCV_API.cpp
     FrameProcessor.cpp
     Algorithms.cpp
+    AlgorithmParam.cpp
     Detector.cpp
     InferenceBackend.cpp
     ModelRegistry.cpp
@@ -111,6 +112,7 @@ add_executable(MediaFusionGCV_Tests
     tests/test_pipeline_lifecycle.cpp
     tests/test_device_enumeration.cpp
     tests/test_inference.cpp
+    tests/test_algorithms.cpp
 )
 
 target_include_directories(MediaFusionGCV_Tests PRIVATE

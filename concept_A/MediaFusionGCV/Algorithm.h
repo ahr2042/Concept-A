@@ -2,6 +2,7 @@
 
 #include "InferenceStats.h"
 #include "AccelBackend.h"
+#include "AlgorithmParam.h"
 
 #include <opencv2/core.hpp>
 
@@ -28,6 +29,15 @@ public:
     // changes. Plain CPU OpenCV ops ignore it; an inference stage uses it to pick
     // between its cv::dnn (CPU) and ncnn-Vulkan / CUDA engines.
     virtual void        setAccel(AccelBackend) {}
+
+    // Optional: apply tuning values, keyed by AlgorithmParam::key. Called before
+    // the stage sees a frame and again whenever the operator changes a control,
+    // so it may run while streaming — a stage that keeps derived state must
+    // rebuild it here rather than in apply(). Only the keys the caller changed
+    // are present; anything absent keeps its current value. Values arrive
+    // already clamped to the schema. A stage that declares no parameters (see
+    // the registry in Algorithms.h) never gets this call.
+    virtual void        setParams(const AlgorithmParams&) {}
 
     // Optional: an inference stage reports what it last produced here so the
     // control protocol can serve DETECTION_SUMMARY / latency telemetry without

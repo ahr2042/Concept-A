@@ -20,6 +20,8 @@ class QStackedWidget;
 
 class NodeCanvas;
 
+namespace vos { class ParamPanel; }
+
 class PipelinePage : public QWidget
 {
     Q_OBJECT
@@ -49,6 +51,8 @@ private:
     QComboBox*      m_capsBox    = nullptr;
     QComboBox*      m_modelBox   = nullptr;
     QList<QCheckBox*> m_algoBoxes;
+    // algorithm name → its generated controls; only for stages with knobs.
+    QHash<QString, vos::ParamPanel*> m_algoPanels;
     QRadioButton*   m_sinkApp    = nullptr;
     QRadioButton*   m_sinkScreen = nullptr;
     QPushButton*    m_deployBtn  = nullptr;

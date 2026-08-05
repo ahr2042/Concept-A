@@ -20,13 +20,20 @@
 #include "InferenceTypes.h"
 
 #include <QHash>
+#include <QMap>
 #include <QObject>
 #include <QProcess>
 #include <QStringList>
 #include <QThread>
+#include <QVariantMap>
 
 class ControlClient;
 class QTimer;
+
+// Tuning for a whole chain: algorithm name → its parameter values. Carried in a
+// DeploySpec so the operator's settings are applied with the chain rather than
+// after it, and re-sent when a control moves on a live session.
+using AlgorithmSettings = QMap<QString, QVariantMap>;
 
 // Runs on the worker thread; owns the blocking socket client.
 class BackendWorker : public QObject
@@ -45,7 +52,8 @@ public slots:
     void deploy(int sessionId, int deviceIndex, int capIndex,
                 const QString& algosCsv, bool screenSink, const QString& name,
                 const QString& detectorModel, double confidence, double nms, bool drawBoxes,
-                const QString& accelSelection);
+                const QString& accelSelection, const AlgorithmSettings& algoParams);
+    void applyAlgorithmParams(int sessionId, const QString& algo, const QVariantMap& values);
     void applyDetector(int sessionId, const QString& model,
                        double confidence, double nms, bool drawBoxes);
     void pollStats();                          // one `stats` per live session
@@ -57,6 +65,8 @@ signals:
     void connectedChanged(bool ok, const QString& socketPath);
     void devicesReady(bool ok, const QVector<DeviceInfo>& devices);
     void algorithmsReady(const QStringList& algorithms);
+    void algorithmParamsReady(const QString& algo, const QString& summary,
+                              const QVector<AlgorithmParamSpec>& params);
     void modelsReady(const QVector<DetectorModel>& models);
     void acceleratorsReady(const QVector<AcceleratorOption>& accelerators);
     void detectorApplied(int sessionId, bool ok, const QString& detail);
@@ -101,6 +111,11 @@ public:
         double  nms         = 0.45;
         bool    drawBoxes   = true;
 
+        // Per-algorithm tuning, applied before `algos` so a stage starts on the
+        // operator's values rather than its defaults. Algorithms absent from the
+        // map simply keep their defaults.
+        AlgorithmSettings algoParams;
+
         // Acceleration backend for this session: "auto"/"cpu"/"vulkan"/"cuda".
         // Sent as `accel <id> <sel>` before start; the daemon resolves AUTO and
         // falls back to CPU for anything unavailable, so a stale pick never fails.
@@ -129,6 +144,16 @@ public:
 
     const QVector<DeviceInfo>& devices() const      { return m_devices; }
     const QStringList& algorithms() const           { return m_algorithms; }
+
+    // Schema for one algorithm, empty until the daemon has answered (the
+    // schemas are fetched once, right after `algos-list`) or if it has no knobs.
+    QVector<AlgorithmParamSpec> algorithmParams(const QString& algo) const
+    { return m_algorithmParams.value(algo); }
+
+    // One-line description of what the stage does, for a control's tooltip.
+    QString algorithmSummary(const QString& algo) const
+    { return m_algorithmSummaries.value(algo); }
+
     const QVector<DetectorModel>& models() const    { return m_models; }
     const QVector<AcceleratorOption>& accelerators() const { return m_accelerators; }
 
@@ -149,6 +174,10 @@ public:
     void setDetector(int sessionId, const QString& model,
                      double confidence, double nms, bool drawBoxes);
 
+    // Retune an algorithm on a running session. Values are clamped by the
+    // engine, so a control can send whatever its widget produces.
+    void setAlgorithmParams(int sessionId, const QString& algo, const QVariantMap& values);
+
     static QString defaultSocketPath();
     static QString defaultBinaryPath();
 
@@ -156,6 +185,8 @@ signals:
     void daemonStateChanged(BackendService::DaemonState state);
     void devicesChanged(const QVector<DeviceInfo>& devices);
     void algorithmsChanged(const QStringList& algorithms);
+    // Emitted once per algorithm as its schema arrives; pages build controls here.
+    void algorithmParamsChanged(const QString& algo, const QVector<AlgorithmParamSpec>& params);
     void sessionStarted(int sessionId, const QString& videoSocket, const QString& description);
     void sessionStopped(int sessionId);
     void sessionFailed(int sessionId, const QString& error);
@@ -191,6 +222,8 @@ private:
 
     QVector<DeviceInfo>    m_devices;
     QStringList            m_algorithms;
+    QHash<QString, QVector<AlgorithmParamSpec>> m_algorithmParams;
+    QHash<QString, QString>                     m_algorithmSummaries;
     QVector<DetectorModel> m_models;
     QVector<AcceleratorOption> m_accelerators;
     QString                m_accelSelection = QStringLiteral("auto");
