@@ -76,6 +76,23 @@ extern "C" {
 	MEDIAFUSIONGCV_API errorState  mediaLib_setAlgorithms(size_t, const char* csvNames);
 	MEDIAFUSIONGCV_API const char* mediaLib_availableAlgorithms();
 
+	// Per-algorithm tuning. The schema describes each knob well enough to build
+	// a control for it without knowing the algorithm — one line per parameter:
+	// "key=<k> type=<int|float|bool|enum> min=<f> max=<f> step=<f> default=<f>
+	//  choices=<a|b|c> label=<TEXT>", label last because it may contain spaces.
+	// Empty for an unknown algorithm or one with no knobs.
+	//
+	// Values are "k=v" comma-separated ("low=90,high=200"); a bool is 0/1 and an
+	// enum is an index into choices. Out-of-range values are clamped, an unknown
+	// key is INVALID_ARGS_ERR. Settings are remembered per pipeline and survive
+	// changes to the algorithm chain, so they can be sent before the stage is
+	// selected. The getter returns current values, "k=v" comma-separated.
+	// Pointers valid until the next call.
+	MEDIAFUSIONGCV_API const char* mediaLib_algorithmParams(const char* algoName);
+	MEDIAFUSIONGCV_API errorState  mediaLib_setAlgorithmParams(size_t, const char* algoName,
+	                                                           const char* kvCsv);
+	MEDIAFUSIONGCV_API const char* mediaLib_getAlgorithmParams(size_t, const char* algoName);
+
 	// Inference stage — configures the "detect" algorithm. The model is loaded
 	// on the spot, so LOAD_MODEL_ERR here means a missing or unreadable graph;
 	// an empty name unloads it. Detector settings are remembered per pipeline

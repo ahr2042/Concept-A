@@ -3,6 +3,7 @@
 #include "GStreamerSinkScreen.h"
 #include "GStreamerSinkApplication.h"
 #include "FrameProcessor.h"
+#include "Algorithms.h"
 #include "ModelRegistry.h"
 #include "AcceleratorRegistry.h"
 
@@ -207,8 +208,30 @@ errorState PipelineManager::setAlgorithms(const std::vector<std::string>& names)
     ensureProcessor();                      // selecting algorithms enables the stage
     if (!processor->valid())
         return errorState::OBJECT_CREATION_ERR;
-    processor->setAlgorithms(names);
+    if (!processor->setAlgorithms(names))
+        return errorState::INVALID_ARGS_ERR;
     return errorState::NO_ERR;
+}
+
+errorState PipelineManager::setAlgorithmParams(const std::string&     algo,
+                                               const AlgorithmParams& values)
+{
+    // Same reasoning as setDetectorModel: tuning is accepted before the stage
+    // is in the chain and replayed when it joins, so the console can set a
+    // control and deploy in either order.
+    ensureProcessor();
+    if (!processor->valid())
+        return errorState::OBJECT_CREATION_ERR;
+    if (!processor->setAlgorithmParams(algo, values))
+        return errorState::INVALID_ARGS_ERR;
+    return errorState::NO_ERR;
+}
+
+AlgorithmParams PipelineManager::algorithmParams(const std::string& algo) const
+{
+    if (!processor || !processor->valid())
+        return defaultParams(::algorithmParams(algo));
+    return processor->algorithmParams(algo);
 }
 
 errorState PipelineManager::setDetectorModel(const std::string& modelNameOrPath)

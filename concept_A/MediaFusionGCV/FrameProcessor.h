@@ -6,6 +6,7 @@
 #include "Algorithm.h"
 #include "Detector.h"
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -36,9 +37,19 @@ public:
     GstElement* filterElement = nullptr;   // capsfilter, "fp-bgr"
 
     // Replace the active algorithm chain by name (thread-safe; may be called
-    // while streaming). Unknown names are skipped.
-    void                     setAlgorithms(const std::vector<std::string>& names);
+    // while streaming). Rejects the whole request and leaves the current chain
+    // alone if any name is unknown — a typo used to yield a silently empty
+    // chain that still reported success.
+    bool                     setAlgorithms(const std::vector<std::string>& names);
     std::vector<std::string> activeAlgorithms() const;
+
+    // Tuning for one stage, keyed by AlgorithmParam::key. Like the detector
+    // config below these live here rather than in the stage, because
+    // setAlgorithms() rebuilds the chain from names and the operator's settings
+    // have to survive that. Values are clamped to the algorithm's schema;
+    // false means an unknown algorithm or an unknown key.
+    bool            setAlgorithmParams(const std::string& algo, const AlgorithmParams& values);
+    AlgorithmParams algorithmParams(const std::string& algo) const;
 
     // Resolved acceleration backend for the chain (CPU/Vulkan/CUDA). Stored and
     // pushed to every current and future stage, so a detector added later still
@@ -58,6 +69,11 @@ public:
 private:
     static GstPadProbeReturn onBuffer(GstPad* pad, GstPadProbeInfo* info, gpointer user);
     GstPadProbeReturn        processBuffer(GstPad* pad, GstPadProbeInfo* info);
+
+    // Overrides only, not a full value set: a rebuilt stage starts at its own
+    // defaults and these are replayed on top, so a later change to a schema
+    // default is picked up instead of being pinned by a stale copy.
+    std::map<std::string, AlgorithmParams>  m_algoParams;
 
     std::vector<std::unique_ptr<Algorithm>> m_algos;
     DetectorConfig                          m_detectorConfig;

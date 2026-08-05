@@ -3,6 +3,8 @@
 
 #include <opencv2/imgproc.hpp>
 
+#include <algorithm>
+
 FrameProcessor::FrameProcessor()
 {
     gst_video_info_init(&m_info);
@@ -32,24 +34,35 @@ FrameProcessor::~FrameProcessor()
     if (filterElement) { gst_object_unref(filterElement); filterElement = nullptr; }
 }
 
-void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
+bool FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 {
-    DetectorConfig cfg = detectorConfig();
-    AccelBackend   accel;
+    // Validate the whole request before building anything: a chain is
+    // all-or-nothing, so a typo cannot half-apply and cannot pass silently.
+    for (const auto& n : names)
+        if (!findAlgorithm(n))
+            return false;
+
+    DetectorConfig                         cfg = detectorConfig();
+    AccelBackend                           accel;
+    std::map<std::string, AlgorithmParams> params;
     {
         std::lock_guard<std::mutex> lk(m_mutex);
-        accel = m_accel;
+        accel  = m_accel;
+        params = m_algoParams;
     }
 
     std::vector<std::unique_ptr<Algorithm>> built;
     built.reserve(names.size());
     for (const auto& n : names) {
         auto a = makeAlgorithm(n);
-        if (!a)
-            continue;
         // Pick the resolved backend before loading so a detector configures the
         // right engine on the spot; plain filters ignore it.
         a->setAccel(accel);
+        // Replay the operator's tuning onto the fresh stage, which would
+        // otherwise come up on its compiled-in defaults.
+        const auto it = params.find(n);
+        if (it != params.end() && !it->second.empty())
+            a->setParams(it->second);
         // A detector joining the chain inherits the model chosen earlier;
         // loading happens here, off the streaming thread.
         if (auto* det = dynamic_cast<DetectorAlgorithm*>(a.get()))
@@ -59,6 +72,53 @@ void FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 
     std::lock_guard<std::mutex> lk(m_mutex);
     m_algos = std::move(built);
+    return true;
+}
+
+bool FrameProcessor::setAlgorithmParams(const std::string& algo, const AlgorithmParams& values)
+{
+    if (!findAlgorithm(algo))
+        return false;
+
+    // ::-qualified: the member of the same name returns current values, this is
+    // the registry's schema.
+    const std::vector<AlgorithmParam> schema = ::algorithmParams(algo);
+
+    // Clamp against the schema here, so every stage can trust what it receives
+    // and no client has to reimplement the ranges.
+    AlgorithmParams clamped;
+    for (const auto& [key, value] : values) {
+        const auto p = std::find_if(schema.begin(), schema.end(),
+                                    [&key](const AlgorithmParam& s) { return s.key == key; });
+        if (p == schema.end())
+            return false;
+        clamped[key] = p->clamp(value);
+    }
+
+    std::lock_guard<std::mutex> lk(m_mutex);
+    for (const auto& [key, value] : clamped)
+        m_algoParams[algo][key] = value;
+
+    // Push to a matching stage already streaming. The streaming thread waits on
+    // this mutex meanwhile, which is what makes a live tweak safe.
+    for (const auto& a : m_algos)
+        if (algo == a->name())
+            a->setParams(clamped);
+    return true;
+}
+
+AlgorithmParams FrameProcessor::algorithmParams(const std::string& algo) const
+{
+    // Schema defaults with the operator's overrides on top, so a caller always
+    // sees a complete, current value set.
+    AlgorithmParams out = defaultParams(::algorithmParams(algo));
+
+    std::lock_guard<std::mutex> lk(m_mutex);
+    const auto it = m_algoParams.find(algo);
+    if (it != m_algoParams.end())
+        for (const auto& [key, value] : it->second)
+            out[key] = value;
+    return out;
 }
 
 void FrameProcessor::setAccel(AccelBackend backend)
