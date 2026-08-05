@@ -222,6 +222,14 @@ const char* mediaLib_algorithmParams(const char* algoName)
 	if (!algoName)
 		return listing.c_str();
 
+	// What the stage does, on its own line because it reads as prose. A client
+	// shows it as the control's tooltip; it is also how an algorithm with no
+	// knobs still has something to say for itself.
+	const AlgorithmInfo* info = findAlgorithm(algoName);
+	if (!info)
+		return listing.c_str();
+	listing += std::string("summary=") + info->summary + "\n";
+
 	for (const auto& p : algorithmParams(algoName)) {
 		listing += "key=" + p.key;
 		listing += " type=";

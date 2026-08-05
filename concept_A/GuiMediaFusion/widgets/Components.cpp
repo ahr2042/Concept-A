@@ -1,10 +1,13 @@
 #include "Components.h"
 #include "../theme/Theme.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QSlider>
 #include <QVBoxLayout>
 
 namespace vos {
@@ -330,6 +333,100 @@ KeyValueRow::KeyValueRow(const QString& key, const QString& value,
 void KeyValueRow::setValue(const QString& v) { m_value->setText(v); }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+namespace {
+
+// Decimals worth showing for a knob, taken from its step: 1 -> 0, 0.05 -> 2.
+int decimalsFor(const AlgorithmParamSpec& p)
+{
+    if (p.type != QLatin1String("float"))
+        return 0;
+    int    decimals = 0;
+    double step     = p.step > 0.0 ? p.step : 0.01;
+    while (step < 1.0 && decimals < 4) {
+        step *= 10.0;
+        ++decimals;
+    }
+    return decimals;
+}
+
+} // namespace
+
+ParamPanel::ParamPanel(const QString& algo, const QVector<AlgorithmParamSpec>& schema,
+                       QWidget* parent)
+    : QWidget(parent), m_algo(algo)
+{
+    auto* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(12, 2, 0, 6);      // indented under its checkbox
+    outer->setSpacing(4);
+
+    for (const AlgorithmParamSpec& p : schema) {
+        m_values.insert(p.key, p.def);
+
+        if (p.type == QLatin1String("bool")) {
+            auto* box = new QCheckBox(p.label, this);
+            box->setChecked(p.def != 0.0);
+            connect(box, &QCheckBox::toggled, this,
+                    [this, key = p.key](bool on) { commit(key, on ? 1.0 : 0.0); });
+            outer->addWidget(box);
+            continue;
+        }
+
+        if (p.type == QLatin1String("enum")) {
+            outer->addWidget(capsLabel(p.label, 8, this));
+            auto* combo = new QComboBox(this);
+            for (const QString& choice : p.choices)
+                combo->addItem(choice.toUpper());
+            combo->setCurrentIndex(static_cast<int>(p.def));
+            connect(combo, &QComboBox::currentIndexChanged, this,
+                    [this, key = p.key](int index) { commit(key, index); });
+            outer->addWidget(combo);
+            continue;
+        }
+
+        // Int and float both ride an integer slider; a float is stepped into
+        // whole units so the widget stays exact and the value is scaled back.
+        const int    decimals = decimalsFor(p);
+        const double step     = p.step > 0.0 ? p.step : 1.0;
+        const int    steps    = qMax(1, qRound((p.max - p.min) / step));
+
+        auto* row = new QHBoxLayout;
+        row->addWidget(capsLabel(p.label, 8, this));
+        row->addStretch(1);
+        auto* readout = dataLabel(QString::number(p.def, 'f', decimals), 10, this);
+        row->addWidget(readout);
+        outer->addLayout(row);
+
+        auto* slider = new QSlider(Qt::Horizontal, this);
+        slider->setRange(0, steps);
+        slider->setValue(qRound((p.def - p.min) / step));
+
+        const auto valueAt = [min = p.min, step](int tick) { return min + tick * step; };
+
+        // Track while dragging so the number follows the thumb...
+        connect(slider, &QSlider::valueChanged, this, [readout, valueAt, decimals](int tick) {
+            readout->setText(QString::number(valueAt(tick), 'f', decimals));
+        });
+        // ...but only commit on release: dragging would otherwise fire one
+        // control command per pixel, the same rule the confidence slider uses.
+        connect(slider, &QSlider::sliderReleased, this, [this, slider, valueAt, key = p.key] {
+            commit(key, valueAt(slider->value()));
+        });
+        // Keyboard and click-on-groove moves never emit sliderReleased.
+        connect(slider, &QSlider::actionTriggered, this,
+                [this, slider, valueAt, key = p.key](int action) {
+            if (action != QAbstractSlider::SliderMove)
+                commit(key, valueAt(slider->sliderPosition()));
+        });
+        outer->addWidget(slider);
+    }
+}
+
+void ParamPanel::commit(const QString& key, double value)
+{
+    m_values.insert(key, value);
+    emit changed(m_algo, m_values);
+}
 
 QLabel* capsLabel(const QString& text, int pt, QWidget* parent, qreal tracking)
 {

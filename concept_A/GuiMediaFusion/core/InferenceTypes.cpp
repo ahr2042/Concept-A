@@ -72,6 +72,47 @@ bool inferenceparser::parseAccelerators(const QString& reply, QVector<Accelerato
     return true;
 }
 
+bool inferenceparser::parseAlgorithmParams(const QString& reply, QString& summary,
+                                           QVector<AlgorithmParamSpec>& out)
+{
+    out.clear();
+    summary.clear();
+    if (!reply.startsWith(QLatin1String("OK")))
+        return false;
+
+    const QStringList lines = reply.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    for (const QString& raw : lines) {
+        const QString line = raw.trimmed();
+        if (line.startsWith(QLatin1String("summary="))) {
+            summary = tailValue(line, QStringLiteral("summary"));
+            continue;
+        }
+        if (!line.startsWith(QLatin1String("key=")))
+            continue;
+
+        const QStringList  tokens = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        AlgorithmParamSpec p;
+        p.key  = value(tokens, QStringLiteral("key"));
+        p.type = value(tokens, QStringLiteral("type"));
+        p.min  = value(tokens, QStringLiteral("min")).toDouble();
+        p.max  = value(tokens, QStringLiteral("max")).toDouble();
+        p.step = value(tokens, QStringLiteral("step")).toDouble();
+        p.def  = value(tokens, QStringLiteral("default")).toDouble();
+
+        // Pipe-separated to keep the field one token; empty for a non-enum.
+        const QString choices = value(tokens, QStringLiteral("choices"));
+        if (!choices.isEmpty())
+            p.choices = choices.split(QLatin1Char('|'), Qt::SkipEmptyParts);
+
+        // Label last on the line, because it is the one field with spaces in it.
+        p.label = tailValue(line, QStringLiteral("label"));
+
+        if (!p.key.isEmpty())
+            out.push_back(p);
+    }
+    return true;
+}
+
 bool inferenceparser::parseStats(const QString& reply, InferenceSnapshot& snapshot)
 {
     snapshot = InferenceSnapshot{};

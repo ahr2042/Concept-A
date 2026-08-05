@@ -4,8 +4,11 @@
 // cannot express lives here (LEDs, toggle switch, badges, mini charts); each
 // widget follows the Stitch design's geometry.
 
+#include "../core/InferenceTypes.h"
+
 #include <QFrame>
 #include <QLabel>
+#include <QVariantMap>
 #include <QVector>
 #include <QWidget>
 
@@ -140,6 +143,35 @@ public:
     void setValue(const QString& v);
 private:
     QLabel* m_value;
+};
+
+// ── ParamPanel ── controls generated from an algorithm's parameter schema ────
+//
+// The console does not know what any given knob means: it renders a slider, a
+// checkbox or a combo from the descriptor the daemon sent, and reports values
+// back under the algorithm's name. An algorithm added to the engine therefore
+// arrives here with working controls and no GUI change.
+//
+// Emits changed() only on a committed edit (slider release, not drag), so a
+// live session gets one control command per adjustment rather than per pixel.
+class ParamPanel : public QWidget
+{
+    Q_OBJECT
+public:
+    ParamPanel(const QString& algo, const QVector<AlgorithmParamSpec>& schema,
+               QWidget* parent = nullptr);
+
+    QString     algorithm() const { return m_algo; }
+    QVariantMap values() const    { return m_values; }
+
+signals:
+    void changed(const QString& algo, const QVariantMap& values);
+
+private:
+    void commit(const QString& key, double value);
+
+    QString     m_algo;
+    QVariantMap m_values;
 };
 
 // Mono ALL_CAPS label helpers (the design's label-caps / data-mono styles).

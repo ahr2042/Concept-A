@@ -22,7 +22,8 @@ class QSlider;
 class QVBoxLayout;
 class VideoTile;
 
-namespace vos { class MiniBars; class KeyValueRow; class StatTile; class Badge; class ToggleSwitch; }
+namespace vos { class MiniBars; class KeyValueRow; class StatTile; class Badge; class ToggleSwitch;
+                class ParamPanel; }
 
 class DashboardPage : public QWidget
 {
@@ -45,6 +46,7 @@ private slots:
     void onModels(const QVector<DetectorModel>& models);
     void onInferenceStats(int sessionId, const InferenceSnapshot& snapshot);
     void onDetectorSettingChanged();     // model / confidence moved by the operator
+    void onAlgorithmParamsChanged(const QString& algo, const QVariantMap& values);
     void onStart();
     void onStop();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
@@ -55,7 +57,8 @@ private slots:
 private:
     QWidget* buildCenterColumn();
     QWidget* buildConfigPanel();
-    QString  algosCsv() const;
+    QString           algosCsv() const;
+    AlgorithmSettings algoParams() const;
     // Enables/checks the GPU_ACCELERATION toggle from detected backends + the
     // current selection (disabled + off when no GPU is present).
     void     refreshAccelToggle();
@@ -70,6 +73,8 @@ private:
     QComboBox*   m_deviceBox = nullptr;
     QComboBox*   m_capsBox   = nullptr;
     QList<QCheckBox*> m_algoBoxes;
+    // algorithm name → its generated controls; only for stages with knobs.
+    QHash<QString, vos::ParamPanel*> m_algoPanels;
     QPushButton* m_startBtn  = nullptr;
     QPushButton* m_stopBtn   = nullptr;
     QLabel*      m_hwLabel   = nullptr;

@@ -106,7 +106,44 @@ void BackendWorker::queryAlgorithms()
         for (const QString& a : csv.split(',', Qt::SkipEmptyParts))
             algos << a.trimmed();
     }
+    // Schemas first, algorithmsReady last. A schema never changes for a given
+    // daemon, so it is fetched once here rather than per checkbox — and the
+    // pages build their controls inside their algorithmsChanged handler, so the
+    // cache has to be filled before that signal lands.
+    for (const QString& a : algos) {
+        QVector<AlgorithmParamSpec> params;
+        QString                     summary;
+        if (cmd(QStringLiteral("algo-params %1").arg(a), reply))
+            inferenceparser::parseAlgorithmParams(reply, summary, params);
+        // Emitted even with no knobs: the summary is worth having on its own,
+        // and it is what the checkbox tooltip is built from.
+        emit algorithmParamsReady(a, summary, params);
+    }
+
     emit algorithmsReady(algos);
+}
+
+// "low=90,high=200" — the wire form of one algorithm's values. Fixed precision
+// rather than shortest-round-trip so the log line is stable to read.
+static QString paramCsv(const QVariantMap& values)
+{
+    QStringList pairs;
+    for (auto it = values.constBegin(); it != values.constEnd(); ++it)
+        pairs << QStringLiteral("%1=%2").arg(it.key()).arg(it.value().toDouble(), 0, 'f', 3);
+    return pairs.join(QLatin1Char(','));
+}
+
+void BackendWorker::applyAlgorithmParams(int sessionId, const QString& algo,
+                                         const QVariantMap& values)
+{
+    if (values.isEmpty() || !m_sessions.contains(sessionId))
+        return;
+
+    QString reply;
+    const QString line = QStringLiteral("algo-set %1 %2 %3")
+                             .arg(m_sessions.value(sessionId)).arg(algo, paramCsv(values));
+    if (!cmd(line, reply) || !reply.startsWith(QStringLiteral("OK")))
+        emit wire(AppLog::Warn, QStringLiteral("algo-set %1 rejected: %2").arg(algo, reply));
 }
 
 void BackendWorker::queryModels()
@@ -180,7 +217,8 @@ void BackendWorker::pollStats()
 void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
                            const QString& algosCsv, bool screenSink, const QString& name,
                            const QString& detectorModel, double confidence, double nms,
-                           bool drawBoxes, const QString& accelSelection)
+                           bool drawBoxes, const QString& accelSelection,
+                           const AlgorithmSettings& algoParams)
 {
     const long id = createPipeline(QStringLiteral("camera"),
                                    screenSink ? QStringLiteral("screen") : QStringLiteral("app"),
@@ -219,6 +257,17 @@ void BackendWorker::deploy(int sessionId, int deviceIndex, int capIndex,
             emit detectorApplied(sessionId, true, detectorModel);
         else
             emit detectorApplied(sessionId, false, detail);
+    }
+
+    // Tuning before the chain, for the same reason as the model above: the
+    // engine remembers it per pipeline and replays it as each stage is built,
+    // so a stage never runs a frame on defaults the operator has changed.
+    for (auto it = algoParams.constBegin(); it != algoParams.constEnd(); ++it) {
+        if (it.value().isEmpty())
+            continue;
+        if (!cmd(QStringLiteral("algo-set %1 %2 %3").arg(id).arg(it.key(), paramCsv(it.value())), reply)
+            || !reply.startsWith(QStringLiteral("OK")))
+            emit wire(AppLog::Warn, QStringLiteral("algo-set '%1' rejected: %2").arg(it.key(), reply));
     }
 
     // Always send algos — an empty csv explicitly disables processing.
@@ -314,6 +363,13 @@ BackendService::BackendService(QObject* parent)
         logInfo("CTL", QStringLiteral("processing algorithms: %1")
                            .arg(a.isEmpty() ? QStringLiteral("(none)") : a.join(", ")));
         emit algorithmsChanged(a);
+    });
+    connect(m_worker, &BackendWorker::algorithmParamsReady, this,
+            [this](const QString& algo, const QString& summary,
+                   const QVector<AlgorithmParamSpec>& params) {
+        m_algorithmParams.insert(algo, params);
+        m_algorithmSummaries.insert(algo, summary);
+        emit algorithmParamsChanged(algo, params);
     });
     connect(m_worker, &BackendWorker::sessionStarted, this,
             [this](int id, const QString& sock, const QString& desc) {
@@ -572,9 +628,18 @@ int BackendService::deploy(const DeploySpec& spec)
     QMetaObject::invokeMethod(m_worker, [w = m_worker, sessionId, spec] {
         w->deploy(sessionId, spec.deviceIndex, spec.capIndex, spec.algosCsv,
                   spec.screenSink, spec.name, spec.detectorModel,
-                  spec.confidence, spec.nms, spec.drawBoxes, spec.accelSelection);
+                  spec.confidence, spec.nms, spec.drawBoxes, spec.accelSelection,
+                  spec.algoParams);
     }, Qt::QueuedConnection);
     return sessionId;
+}
+
+void BackendService::setAlgorithmParams(int sessionId, const QString& algo,
+                                        const QVariantMap& values)
+{
+    QMetaObject::invokeMethod(m_worker, [w = m_worker, sessionId, algo, values] {
+        w->applyAlgorithmParams(sessionId, algo, values);
+    }, Qt::QueuedConnection);
 }
 
 void BackendService::setDetector(int sessionId, const QString& model,

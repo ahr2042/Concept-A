@@ -353,8 +353,10 @@ void PipelinePage::onAlgorithms(const QStringList& algos)
         delete item;
     }
     m_algoBoxes.clear();
+    m_algoPanels.clear();
     for (const QString& a : algos) {
         auto* cb = new QCheckBox(a.toUpper(), host);
+        cb->setToolTip(m_service->algorithmSummary(a));
         connect(cb, &QCheckBox::toggled, this, [this] {
             QStringList active;
             for (QCheckBox* b : m_algoBoxes)
@@ -364,6 +366,22 @@ void PipelinePage::onAlgorithms(const QStringList& algos)
         });
         m_algoBoxes.append(cb);
         host->layout()->addWidget(cb);
+
+        // Controls for this stage's knobs, revealed with the stage itself.
+        const QVector<AlgorithmParamSpec> schema = m_service->algorithmParams(a);
+        if (schema.isEmpty())
+            continue;
+
+        auto* panel = new vos::ParamPanel(a, schema, host);
+        panel->setVisible(false);
+        connect(cb, &QCheckBox::toggled, panel, &QWidget::setVisible);
+        connect(panel, &vos::ParamPanel::changed, this,
+                [this](const QString& algo, const QVariantMap& values) {
+            if (m_sessionId >= 0)
+                m_service->setAlgorithmParams(m_sessionId, algo, values);
+        });
+        m_algoPanels.insert(a, panel);
+        host->layout()->addWidget(panel);
     }
     m_canvas->setNodeTitle(1, QStringLiteral("PASSTHROUGH"));
 }
@@ -376,8 +394,14 @@ void PipelinePage::onDeploy()
     spec.deviceIndex = m_deviceBox->currentData().toInt();
     spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
     QStringList active;
-    for (QCheckBox* b : m_algoBoxes)
-        if (b->isChecked()) active << b->text().toLower();
+    for (QCheckBox* b : m_algoBoxes) {
+        if (!b->isChecked())
+            continue;
+        const QString algo = b->text().toLower();
+        active << algo;
+        if (auto* panel = m_algoPanels.value(algo, nullptr))
+            spec.algoParams.insert(algo, panel->values());
+    }
     spec.algosCsv   = active.join(',');
     spec.screenSink = m_sinkScreen->isChecked();
     spec.name       = QStringLiteral("pipeline-editor");
