@@ -87,7 +87,8 @@ Old `GuiMediaFusion{,Model,Controller}`, `PreLaunchSettings.ui`, `guiElements.h`
 | START/STOP stream, REBOOT_CORE, TERMINATE_PID | **REAL** | deploy/stop session; daemon restart/shutdown |
 | Device list & caps selection (Device Manager) | **REAL** | `devices` → DeviceParser; CONNECT = `set-device` |
 | Protocol filter chips USB / RTSP / GigE / CoaXPress | PARTIAL | USB (V4L2) real; others disabled `PLANNED` |
-| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → grayscale/canny/detect checkboxes → `algos` |
+| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → one checkbox per reported algorithm → `algos` |
+| Per-algorithm parameter controls | **REAL** | `algo-params <algo>` → generated sliders/toggles/combos under each checkbox → `algo-set` (live) or carried in the deploy |
 | Pipeline editor canvas SOURCE→PROCESS→SINK | PARTIAL | fixed linear chain (matches backend); node drag `PLANNED` |
 | DEPLOY PIPELINE | **REAL** | create → set-device → algos → start |
 | Multi-grid 2×2 tiles, per-tile source | **REAL**¹ | one session per tile (¹ limited by #cameras) |

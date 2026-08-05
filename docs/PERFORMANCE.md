@@ -59,6 +59,26 @@ a single camera — before any question of a second one.
 `detect` stage live. Both are gaps in this baseline; fill them when the hardware
 is on the desk.
 
+### Cost of a processing stage
+
+One camera, MJPEG 1280×720, RelWithDebInfo, CPU accel, measured 2026-08-05 in one
+sitting. `framediff` at its defaults and `canny` are both **free at the rate this
+camera delivers**:
+
+| Chain | fps | dropped |
+|---|---|---|
+| (none) | 15.06 | 0 |
+| `framediff` | 15.06 | 0 |
+| `canny` | 15.07 | 0 |
+
+Read that as a budget statement, not as "these stages are free": the camera was
+delivering 15 fps that afternoon (auto-exposure again — the same mode measured
+20.1 fps for the baseline above, in better light), so each frame had ~66 ms of
+slack and a stage costing a few ms cannot show up. The number that would move
+first is `dropped:`, and it did not. To measure a stage's actual cost, a
+synthetic source is needed — the camera cannot be driven fast enough to expose
+it.
+
 ## Landed
 
 | # | Item | Where |
@@ -94,6 +114,13 @@ S (a sitting), M (a session), L (multi-session or needs a design decision).
 | P21 | Per-pipeline retained caps text dump | low | S | open |
 
 ### Notes
+
+**Watch out when the motion stages land.** `framediff` is single-channel and
+cheap. Its successors are not: MOG2 background subtraction is ~10–15 ms at 1080p
+and dense optical flow is far worse, and the whole chain runs on the streaming
+thread holding `FrameProcessor::m_mutex` (see P15). Run the analysis on a
+downscaled copy and scale the result back up for drawing — a motion mask does not
+need 1080p — rather than paying full resolution for it.
 
 **P6 — skip the convert when nothing processes.** `source->converter`
 (`videoconvert`) is created in the `PipelineManager` constructor and always
