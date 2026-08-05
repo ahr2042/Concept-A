@@ -10,7 +10,8 @@
 #     control protocol).
 #   * OpenCV comes from source, not apt: the detector needs 4.8+ to import
 #     current YOLO ONNX exports and 24.04 ships 4.6. The install prefix is
-#     cached, so only the first run (or an OPENCV_VERSION bump) pays for it.
+#     cached, and the cache key hashes the build script — a version bump or a
+#     changed module list rebuilds, everything else hits the cache.
 
 name: CI
 
@@ -49,7 +50,10 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.local
-          key: opencv-${{ env.OPENCV_VERSION }}-ubuntu-24.04
+          # The script's hash is part of the key: BUILD_LIST lives in there, and
+          # a cache built before a module was added would otherwise be restored
+          # and fail the engine build on a missing header.
+          key: opencv-${{ env.OPENCV_VERSION }}-${{ hashFiles('scripts/build-opencv.sh') }}-ubuntu-24.04
 
       - name: Build OpenCV from source
         if: steps.opencv-cache.outputs.cache-hit != 'true'
