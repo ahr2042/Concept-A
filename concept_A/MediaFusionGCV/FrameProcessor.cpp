@@ -152,13 +152,20 @@ DetectorConfig FrameProcessor::detectorConfig() const
     return m_detectorConfig;
 }
 
-bool FrameProcessor::inferenceStats(InferenceStats& out) const
+std::vector<InferenceStats> FrameProcessor::stageStats() const
 {
     std::lock_guard<std::mutex> lk(m_mutex);
-    for (const auto& a : m_algos)
-        if (a->snapshotStats(out))
-            return true;
-    return false;
+
+    std::vector<InferenceStats> out;
+    for (const auto& a : m_algos) {
+        InferenceStats st;
+        // snapshotStats() clears its output first, so the name goes on after.
+        if (a->snapshotStats(st)) {
+            st.stage = a->name();
+            out.push_back(std::move(st));
+        }
+    }
+    return out;
 }
 
 std::vector<std::string> FrameProcessor::activeAlgorithms() const

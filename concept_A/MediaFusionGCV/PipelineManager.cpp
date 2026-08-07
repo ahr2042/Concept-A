@@ -268,9 +268,11 @@ errorState PipelineManager::setDetectorParams(float confidence, float nms, bool 
     return errorState::NO_ERR;
 }
 
-bool PipelineManager::inferenceStats(InferenceStats& out) const
+std::vector<InferenceStats> PipelineManager::stageStats() const
 {
-    return processor && processor->valid() && processor->inferenceStats(out);
+    if (!processor || !processor->valid())
+        return {};
+    return processor->stageStats();
 }
 
 // The GStreamer element chain that does the colorspace convert on the GPU for a

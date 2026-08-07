@@ -63,8 +63,11 @@ public:
     bool           setDetectorConfig(const DetectorConfig& cfg);
     DetectorConfig detectorConfig() const;
 
-    // Stats from the inference stage; false when no detector is in the chain.
-    bool inferenceStats(InferenceStats& out) const;
+    // What every reporting stage in the chain last produced, in chain order;
+    // empty when no stage reports. Deliberately a list rather than "the stats":
+    // more than one stage can report (a detector and a motion stage), and
+    // returning only the first hid the others with no error and no clue.
+    std::vector<InferenceStats> stageStats() const;
 
 private:
     static GstPadProbeReturn onBuffer(GstPad* pad, GstPadProbeInfo* info, gpointer user);

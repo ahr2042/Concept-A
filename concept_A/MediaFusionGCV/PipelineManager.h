@@ -59,8 +59,9 @@ public:
     errorState setDetectorModel(const std::string& modelNameOrPath);
     errorState setDetectorParams(float confidence, float nms, bool drawBoxes);
 
-    // False when this pipeline has no inference stage in its chain.
-    bool inferenceStats(InferenceStats& out) const;
+    // What each reporting stage in this pipeline's chain last produced, in chain
+    // order. Empty when no stage reports, which includes having no chain at all.
+    std::vector<InferenceStats> stageStats() const;
 
     // Acceleration backend selection (auto/cpu/vulkan/cuda). Resolved against the
     // detected hardware at the next startStreaming(), since the choice shapes the
