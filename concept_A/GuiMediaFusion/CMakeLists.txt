@@ -35,6 +35,7 @@ set(SOURCE_FILES
     core/InferenceTypes.cpp
     core/SystemMonitor.cpp
     theme/Theme.cpp
+    widgets/ChainEditor.cpp
     widgets/Components.cpp
     widgets/Shell.cpp
     widgets/VideoTile.cpp

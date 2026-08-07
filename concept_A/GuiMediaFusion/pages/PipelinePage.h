@@ -8,6 +8,7 @@
 // create → set-device → algos → start sequence; free node graphs stay PLANNED.
 
 #include "../core/BackendService.h"
+#include "../widgets/ChainEditor.h"
 
 #include <QWidget>
 
@@ -51,9 +52,8 @@ private:
     QComboBox*      m_deviceBox  = nullptr;
     QComboBox*      m_capsBox    = nullptr;
     QComboBox*      m_modelBox   = nullptr;
-    QList<QCheckBox*> m_algoBoxes;
-    // algorithm name → its generated controls; only for stages with knobs.
-    QHash<QString, vos::ParamPanel*> m_algoPanels;
+    // The processing chain, in the one widget that owns it console-wide.
+    vos::ChainEditor* m_chain = nullptr;
     QRadioButton*   m_sinkApp    = nullptr;
     QRadioButton*   m_sinkScreen = nullptr;
     QPushButton*    m_deployBtn  = nullptr;

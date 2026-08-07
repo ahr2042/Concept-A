@@ -239,12 +239,17 @@ QWidget* PipelinePage::buildPropertiesPanel()
     procLay->addWidget(procTitle);
     procLay->addWidget(vos::capsLabel(QStringLiteral("ID: NODE_PROC_0002 — IN-PLACE PAD PROBE"), 8, proc));
     procLay->addWidget(vos::capsLabel(QStringLiteral("REAL-TIME ALGORITHMS"), 8, proc));
-    auto* algoHost = new QWidget(proc);
-    algoHost->setObjectName(QStringLiteral("pipeAlgoHost"));
-    auto* algoLay = new QVBoxLayout(algoHost);
-    algoLay->setContentsMargins(0, 0, 0, 0);
-    algoLay->setSpacing(6);
-    procLay->addWidget(algoHost);
+    m_chain = new vos::ChainEditor(m_service, proc);
+    procLay->addWidget(m_chain);
+    connect(m_chain, &vos::ChainEditor::chainChanged, this,
+            [this](const QString&, const AlgorithmSettings&) { publishChain(); });
+    // A knob committed on a running session takes effect within a frame or two;
+    // without one the value simply waits in the config for the next deploy.
+    connect(m_chain, &vos::ChainEditor::stageRetuned, this,
+            [this](const QString& algo, const QVariantMap& values) {
+        if (m_sessionId >= 0)
+            m_service->setAlgorithmParams(m_sessionId, algo, values);
+    });
 
     procLay->addWidget(vos::makeHSeparator(proc));
     auto* aiRow = new QHBoxLayout;
@@ -345,61 +350,24 @@ void PipelinePage::onModels(const QVector<DetectorModel>& models)
 
 void PipelinePage::onAlgorithms(const QStringList& algos)
 {
-    auto* host = findChild<QWidget*>(QStringLiteral("pipeAlgoHost"));
-    if (!host) return;
-    QLayoutItem* item;
-    while ((item = host->layout()->takeAt(0)) != nullptr) {
-        delete item->widget();
-        delete item;
-    }
-    m_algoBoxes.clear();
-    m_algoPanels.clear();
-    for (const QString& a : algos) {
-        auto* cb = new QCheckBox(a.toUpper(), host);
-        cb->setToolTip(m_service->algorithmSummary(a));
-        connect(cb, &QCheckBox::toggled, this, [this] {
-            QStringList active;
-            for (QCheckBox* b : m_algoBoxes)
-                if (b->isChecked()) active << b->text();
-            m_canvas->setNodeTitle(1, active.isEmpty() ? QStringLiteral("PASSTHROUGH")
-                                                       : active.join(QStringLiteral(" → ")));
-        });
-        m_algoBoxes.append(cb);
-        host->layout()->addWidget(cb);
-
-        // Controls for this stage's knobs, revealed with the stage itself.
-        const QVector<AlgorithmParamSpec> schema = m_service->algorithmParams(a);
-        if (schema.isEmpty())
-            continue;
-
-        auto* panel = new vos::ParamPanel(a, schema, host);
-        panel->setVisible(false);
-        connect(cb, &QCheckBox::toggled, panel, &QWidget::setVisible);
-        connect(panel, &vos::ParamPanel::changed, this,
-                [this](const QString& algo, const QVariantMap& values) {
-            if (m_sessionId >= 0)
-                m_service->setAlgorithmParams(m_sessionId, algo, values);
-        });
-        m_algoPanels.insert(a, panel);
-        host->layout()->addWidget(panel);
-    }
-    m_canvas->setNodeTitle(1, QStringLiteral("PASSTHROUGH"));
+    if (m_chain)
+        m_chain->rebuild(algos);
 }
 
-// Mirror this page's chain widgets into the shared working config.
+// Mirror the chain editor into the shared working config, and keep the canvas
+// node reading as what the chain actually does.
 void PipelinePage::publishChain()
 {
-    QStringList       active;
-    AlgorithmSettings params;
-    for (QCheckBox* b : m_algoBoxes) {
-        if (!b->isChecked())
-            continue;
-        const QString algo = b->text().toLower();
-        active << algo;
-        if (auto* panel = m_algoPanels.value(algo, nullptr))
-            params.insert(algo, panel->values());
-    }
-    m_service->setChain(active.join(','), params);
+    if (!m_chain)
+        return;
+    const QString csv = m_chain->algosCsv();
+    m_service->setChain(csv, m_chain->algoParams());
+
+    const QStringList active = csv.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    m_canvas->setNodeTitle(1, active.isEmpty()
+        ? QStringLiteral("PASSTHROUGH")
+        : active.join(QStringLiteral(" → ")).toUpper());
+
     if (m_modelBox->isEnabled())
         m_service->setDetectorSettings(m_modelBox->currentData().toString(),
                                        m_service->config().confidence,
