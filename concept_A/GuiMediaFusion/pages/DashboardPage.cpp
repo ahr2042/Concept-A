@@ -48,8 +48,8 @@ DashboardPage::DashboardPage(BackendService* service, SystemMonitor* monitor, QW
     lay->addWidget(buildConfigPanel());
 
     connect(m_service, &BackendService::devicesChanged,    this, &DashboardPage::onDevices);
-    connect(m_service, &BackendService::algorithmsChanged, this, &DashboardPage::onAlgorithms);
     connect(m_service, &BackendService::modelsChanged,     this, &DashboardPage::onModels);
+    connect(m_service, &BackendService::configChanged,     this, &DashboardPage::onConfigChanged);
     connect(m_service, &BackendService::inferenceStatsChanged,
             this, &DashboardPage::onInferenceStats);
     connect(m_service, &BackendService::sessionStarted,    this, &DashboardPage::onSessionStarted);
@@ -71,6 +71,11 @@ DashboardPage::DashboardPage(BackendService* service, SystemMonitor* monitor, QW
         m_throughput->setValue(QStringLiteral("%1 MB/s").arg(mbps, 0, 'f', 1));
         emit fpsSample(fps);
     });
+    // Show the config as it stands rather than waiting for a change: the first
+    // source selection matches the defaults, so configChanged never fires for it
+    // and the panel would sit on placeholder dashes until something moved.
+    onConfigChanged(m_service->config());
+
     connect(m_tile, &VideoTile::streamError, this, [this](const QString& e) {
         logErr("STREAM", QStringLiteral("receiver error: %1").arg(e));
         if (m_sessionId >= 0)
@@ -135,18 +140,28 @@ QWidget* DashboardPage::buildConfigPanel()
     outer->setContentsMargins(14, 14, 14, 14);
     outer->setSpacing(10);
 
-    // ── PIPELINE_CONFIGURATION (real) ──
-    outer->addWidget(new vos::SectionHeader(QStringLiteral("PIPELINE_CONFIGURATION"), panel));
+    // ── STREAM_CONTROL ──
+    //
+    // This page watches a pipeline run; it does not build one. The chain is
+    // shown, not edited — the editor lives on the Pipeline page, which is the
+    // console's one configuration surface. Both used to carry a full copy of it.
+    outer->addWidget(new vos::SectionHeader(QStringLiteral("STREAM_CONTROL"), panel));
 
-    outer->addWidget(vos::capsLabel(QStringLiteral("PROCESSING CHAIN (OPENCV)"), 8, panel));
-    auto* algoHost = new QWidget(panel);
-    auto* algoLay = new QVBoxLayout(algoHost);
-    algoLay->setContentsMargins(0, 0, 0, 0);
-    algoLay->setSpacing(6);
-    m_algoBoxes.clear();
-    algoLay->addWidget(new QLabel(QStringLiteral("querying daemon…"), algoHost));
-    outer->addWidget(algoHost);
-    algoHost->setObjectName(QStringLiteral("algoHost"));
+    auto* chainHead = new QHBoxLayout;
+    chainHead->addWidget(vos::capsLabel(QStringLiteral("ACTIVE CHAIN"), 8, panel));
+    chainHead->addStretch(1);
+    auto* configure = new QPushButton(QStringLiteral("CONFIGURE →"), panel);
+    configure->setProperty("vosRole", QStringLiteral("outline"));
+    configure->setCursor(Qt::PointingHandCursor);
+    configure->setFixedHeight(24);
+    configure->setToolTip(QStringLiteral("Edit the processing chain on the Pipeline page"));
+    connect(configure, &QPushButton::clicked, this, &DashboardPage::configureRequested);
+    chainHead->addWidget(configure);
+    outer->addLayout(chainHead);
+
+    m_chainSummary = vos::dataLabel(QStringLiteral("—"), 10, panel);
+    m_chainSummary->setWordWrap(true);
+    outer->addWidget(m_chainSummary);
 
     auto* btnRow = new QHBoxLayout;
     m_startBtn = new QPushButton(QStringLiteral("START_STREAM"), panel);
@@ -169,68 +184,14 @@ QWidget* DashboardPage::buildConfigPanel()
     aiHead->addStretch(1);
     outer->addLayout(aiHead);
 
-    outer->addWidget(vos::capsLabel(QStringLiteral("DETECTION MODEL"), 8, panel));
-    m_modelBox = new QComboBox(panel);
-    m_modelBox->addItem(QStringLiteral("QUERYING…"));
-    m_modelBox->setEnabled(false);
-    m_modelBox->setToolTip(QStringLiteral("Models found in models/ — see scripts/fetch-models.sh.\n"
-                                          "Enable the DETECT stage in the processing chain to run one."));
-    connect(m_modelBox, &QComboBox::currentIndexChanged,
-            this, &DashboardPage::onDetectorSettingChanged);
-    outer->addWidget(m_modelBox);
+    // Read-only: the model and its thresholds are set where the chain is set.
+    m_modelLabel = vos::dataLabel(QStringLiteral("—"), 10, panel);
+    m_modelLabel->setWordWrap(true);
+    m_modelLabel->setToolTip(QStringLiteral("Chosen on the Pipeline page, with the rest of the chain"));
+    outer->addWidget(m_modelLabel);
 
-    auto* confRow = new QHBoxLayout;
-    confRow->addWidget(vos::capsLabel(QStringLiteral("CONFIDENCE"), 8, panel));
-    confRow->addStretch(1);
-    m_confLabel = vos::dataLabel(QStringLiteral("0.25"), 10, panel);
-    confRow->addWidget(m_confLabel);
-    outer->addLayout(confRow);
-
-    m_confSlider = new QSlider(Qt::Horizontal, panel);
-    m_confSlider->setRange(5, 95);            // 0.05 … 0.95
-    m_confSlider->setValue(25);
-    connect(m_confSlider, &QSlider::valueChanged, this, [this](int v) {
-        m_confLabel->setText(QString::number(v / 100.0, 'f', 2));
-    });
-    // Only push on release: dragging would otherwise fire a control command per pixel.
-    connect(m_confSlider, &QSlider::sliderReleased, this, &DashboardPage::onDetectorSettingChanged);
-    outer->addWidget(m_confSlider);
-
-    auto* accelCard = vos::makeCard("raised", panel);
-    auto* accelLay = new QHBoxLayout(accelCard);
-    accelLay->setContentsMargins(10, 8, 10, 8);
-    auto* accelText = new QVBoxLayout;
-    accelText->setSpacing(2);
-    auto* accelTitle = vos::dataLabel(QStringLiteral("GPU_ACCELERATION"), 10, accelCard);
-    m_hwLabel = vos::capsLabel(m_monitor->gpuName(), 8, accelCard);
-    accelText->addWidget(accelTitle);
-    accelText->addWidget(m_hwLabel);
-    accelLay->addLayout(accelText);
-    accelLay->addStretch(1);
-    m_accelToggle = new vos::ToggleSwitch(accelCard);
-    connect(m_accelToggle, &vos::ToggleSwitch::toggled, this, [this](bool on) {
-        // ON = let the detector use the GPU (AUTO resolves to Vulkan); OFF = CPU.
-        m_service->setAccelSelection(on ? QStringLiteral("auto") : QStringLiteral("cpu"));
-    });
-    connect(m_service, &BackendService::acceleratorsChanged, this,
-            [this](const QVector<AcceleratorOption>&) { refreshAccelToggle(); });
-    connect(m_service, &BackendService::accelSelectionChanged, this,
-            [this](const QString&) { refreshAccelToggle(); },
-            Qt::QueuedConnection);   // sync with Settings radios (deferred; see SettingsPage)
-    accelLay->addWidget(m_accelToggle);
-    refreshAccelToggle();
-    m_service->refreshAccelerators();
-    outer->addWidget(accelCard);
-
-    outer->addWidget(vos::makeHSeparator(panel));
-
-    // ── DETECTION_SUMMARY (real, fed by the 1 Hz stats poll) ──
-    auto* sumHead = new QHBoxLayout;
-    sumHead->addWidget(new vos::SectionHeader(QStringLiteral("DETECTION_SUMMARY"), panel));
     m_sumBadge = new vos::Badge(QStringLiteral("OFFLINE"), vos::Badge::Planned, panel);
-    sumHead->addWidget(m_sumBadge);
-    sumHead->addStretch(1);
-    outer->addLayout(sumHead);
+    m_sumBadge->setVisible(false);         // the AI badge above already says this
 
     auto* tiles = new QHBoxLayout;
     tiles->setSpacing(8);
@@ -241,6 +202,8 @@ QWidget* DashboardPage::buildConfigPanel()
     tiles->addWidget(m_objectsTile);
     tiles->addWidget(m_confTile);
     outer->addLayout(tiles);
+
+    outer->addWidget(vos::makeHSeparator(panel));
 
     // ── RECENT EVENTS (real feed) ──
     outer->addWidget(new vos::SectionHeader(QStringLiteral("RECENT_EVENTS"), panel));
@@ -306,107 +269,27 @@ QString DashboardPage::sourceName() const
     return QStringLiteral("SOURCE");
 }
 
-void DashboardPage::onAlgorithms(const QStringList& algos)
-{
-    auto* host = findChild<QWidget*>(QStringLiteral("algoHost"));
-    if (!host) return;
-    QLayoutItem* item;
-    while ((item = host->layout()->takeAt(0)) != nullptr) {
-        delete item->widget();
-        delete item;
-    }
-    m_algoBoxes.clear();
-    m_algoPanels.clear();
-    if (algos.isEmpty()) {
-        host->layout()->addWidget(new QLabel(QStringLiteral("no algorithms reported"), host));
-        return;
-    }
-    for (const QString& a : algos) {
-        auto* cb = new QCheckBox(a.toUpper(), host);
-        cb->setToolTip(m_service->algorithmSummary(a));
-        m_algoBoxes.append(cb);
-        host->layout()->addWidget(cb);
-        connect(cb, &QCheckBox::toggled, this,
-                [this] { m_service->setChain(algosCsv(), algoParams()); });
-
-        // Controls for whatever knobs this algorithm declares, hidden until the
-        // stage is actually selected so the panel does not fill with sliders
-        // for stages that are switched off.
-        const QVector<AlgorithmParamSpec> schema = m_service->algorithmParams(a);
-        if (schema.isEmpty())
-            continue;
-
-        auto* panel = new vos::ParamPanel(a, schema, host);
-        panel->setVisible(false);
-        connect(cb, &QCheckBox::toggled, panel, &QWidget::setVisible);
-        connect(panel, &vos::ParamPanel::changed, this, &DashboardPage::onAlgorithmParamsChanged);
-        m_algoPanels.insert(a, panel);
-        host->layout()->addWidget(panel);
-    }
-}
-
-// A knob moved. On a live session push it straight through; otherwise it is
-// picked up by the next deploy, which carries the whole map.
-void DashboardPage::onAlgorithmParamsChanged(const QString& algo, const QVariantMap& values)
-{
-    if (m_sessionId >= 0)
-        m_service->setAlgorithmParams(m_sessionId, algo, values);
-    m_service->setChain(algosCsv(), algoParams());
-}
-
-// Values for every algorithm currently ticked — an unticked stage is not in the
-// chain, so sending its tuning would be noise.
-AlgorithmSettings DashboardPage::algoParams() const
-{
-    AlgorithmSettings out;
-    for (QCheckBox* cb : m_algoBoxes) {
-        if (!cb->isChecked())
-            continue;
-        const QString algo  = cb->text().toLower();
-        auto*         panel = m_algoPanels.value(algo, nullptr);
-        if (panel)
-            out.insert(algo, panel->values());
-    }
-    return out;
-}
-
 void DashboardPage::onModels(const QVector<DetectorModel>& models)
 {
-    const QString previous = m_modelBox->currentData().toString();
-    QSignalBlocker block(m_modelBox);          // repopulating must not fire a reconfigure
-    m_modelBox->clear();
-
-    if (models.isEmpty()) {
-        m_modelBox->addItem(QStringLiteral("NO_MODEL_INSTALLED"));
-        m_modelBox->setEnabled(false);
+    // Choosing a model belongs with the chain, on the Pipeline page. All this
+    // page needs from the list is whether there is anything to run at all.
+    if (models.isEmpty())
         m_aiBadge->setToolTip(QStringLiteral("No weights in models/ — run scripts/fetch-models.sh"));
-        return;
-    }
-
-    for (const DetectorModel& m : models) {
-        const QString label = m.classCount > 0
-                            ? QStringLiteral("%1 (%2 classes)").arg(m.name.toUpper()).arg(m.classCount)
-                            : m.name.toUpper();
-        m_modelBox->addItem(label, m.name);
-    }
-    m_modelBox->setEnabled(true);
-
-    const int restored = m_modelBox->findData(previous);
-    if (restored >= 0)
-        m_modelBox->setCurrentIndex(restored);
 }
 
-void DashboardPage::onDetectorSettingChanged()
+// The working config changed somewhere — on the Pipeline page, or in the rail.
+// This page only reports it.
+void DashboardPage::onConfigChanged(const BackendService::DeploySpec& cfg)
 {
-    if (m_modelBox->isEnabled())
-        m_service->setDetectorSettings(m_modelBox->currentData().toString(),
-                                       m_confSlider->value() / 100.0, 0.45, true);
-    // Pushing to a live session is separate: without one the values simply wait
-    // in the config for the next deploy.
-    if (m_sessionId < 0 || !m_modelBox->isEnabled())
-        return;
-    m_service->setDetector(m_sessionId, m_modelBox->currentData().toString(),
-                           m_confSlider->value() / 100.0, 0.45, true);
+    const QStringList active = cfg.algosCsv.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    m_chainSummary->setText(active.isEmpty()
+        ? QStringLiteral("PASSTHROUGH — NO PROCESSING")
+        : active.join(QStringLiteral("  →  ")).toUpper());
+
+    m_modelLabel->setText(cfg.detectorModel.isEmpty()
+        ? QStringLiteral("NO MODEL SELECTED")
+        : QStringLiteral("%1 · CONF %2").arg(cfg.detectorModel.toUpper())
+                                        .arg(cfg.confidence, 0, 'f', 2));
 }
 
 void DashboardPage::onInferenceStats(int sessionId, const InferenceSnapshot& s)
@@ -441,28 +324,6 @@ void DashboardPage::onInferenceStats(int sessionId, const InferenceSnapshot& s)
     m_objectsTile->setValue(QString::number(s.objectCount));
     m_confTile->setValue(s.objectCount > 0 ? QString::number(s.avgConfidence, 'f', 2)
                                            : QStringLiteral("—"));
-}
-
-QString DashboardPage::algosCsv() const
-{
-    QStringList active;
-    for (QCheckBox* cb : m_algoBoxes)
-        if (cb->isChecked())
-            active << cb->text().toLower();
-    return active.join(',');
-}
-
-void DashboardPage::refreshAccelToggle()
-{
-    if (!m_accelToggle) return;
-    bool gpu = false;
-    for (const AcceleratorOption& o : m_service->accelerators())
-        if (o.available && o.backend != QLatin1String("cpu")) gpu = true;
-    m_accelToggle->setEnabled(gpu);
-    m_accelToggle->setChecked(gpu && m_service->accelSelection() != QLatin1String("cpu"));
-    m_accelToggle->setToolTip(gpu
-        ? QStringLiteral("Run the detector on the GPU (ncnn + Vulkan). Applied on the next deploy.")
-        : QStringLiteral("No GPU detected — CPU only."));
 }
 
 void DashboardPage::onStart()

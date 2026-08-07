@@ -138,6 +138,11 @@ MainWindow::MainWindow()
     });
 
     connect(m_dashboard, &DashboardPage::fpsSample, m_analytics, &AnalyticsPage::pushFps);
+    // The Dashboard shows the chain; the Pipeline page is where it is built.
+    connect(m_dashboard, &DashboardPage::configureRequested, this, [this] {
+        m_pages->setCurrentWidget(m_pipeline);
+        m_topBar->nav()->setCurrent(1);
+    });
     connect(m_settings, &SettingsPage::accentChanged, this, &MainWindow::applyTheme);
     connect(m_settings, &SettingsPage::verbosityChanged, this, [this](int lvl) {
         m_logs->setMinLevel(lvl);
