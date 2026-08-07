@@ -271,6 +271,248 @@ GST_START_TEST(test_framediff_reports_motion_only_where_it_happened)
 }
 GST_END_TEST
 
+// --- motion (background subtraction) ------------------------------------
+//
+// These stages are statistical rather than pointwise: nothing they say about
+// the first frame means anything, so each case feeds a scene until the model
+// has settled and only then asks what moved.
+
+namespace {
+
+// A scene with structure in it, so "nothing moved" is a claim about an image
+// and not about flat colour. `block` is the thing that will move.
+cv::Mat scene(cv::Size size, const cv::Rect& block)
+{
+    cv::Mat m(size, CV_8UC3, cv::Scalar(30, 60, 90));
+    cv::rectangle(m, cv::Rect(0, 0, size.width, size.height / 4),
+                  cv::Scalar(70, 70, 70), -1);
+    cv::rectangle(m, block, cv::Scalar(240, 240, 240), -1);
+    return m;
+}
+
+// Hold a scene still until the subtractor accepts it as background. A fresh
+// model reports everything as foreground, and KNN in particular needs enough
+// frames to fill its sample buffers -- the tests shorten `history` to keep
+// that count small.
+void settle(Algorithm& algo, const cv::Mat& still, int frames)
+{
+    for (int i = 0; i < frames; ++i) {
+        cv::Mat f = still.clone();
+        algo.apply(f);
+    }
+}
+
+// Moving pixels inside a region of a mask-mode result.
+int flagged(const cv::Mat& rendered, const cv::Rect& region)
+{
+    cv::Mat gray;
+    cv::cvtColor(rendered(region), gray, cv::COLOR_BGR2GRAY);
+    return cv::countNonZero(gray);
+}
+
+// Tuning shared by the cases below: a short history so both models converge in
+// a test-sized number of frames, and mask mode so the result is exactly the
+// stage's verdict with nothing blended into it.
+AlgorithmParams motionTuning(double method, double shadows)
+{
+    return { { "method", method }, { "history", 100.0 },
+             { "mode", 1.0 }, { "shadows", shadows } };
+}
+
+constexpr int kSettleFrames = 150;
+
+} // namespace
+
+// The core claim of the stage, asked of both subtractors behind the one knob:
+// a scene it has learned is quiet, and a block that moves lights up where it
+// went and where it left -- and nowhere else.
+GST_START_TEST(test_motion_learns_the_scene_before_flagging_it)
+{
+    const cv::Size size(160, 120);
+    const cv::Rect startsAt(20, 20, 30, 30);
+    const cv::Rect movesTo(100, 60, 30, 30);
+    const cv::Rect untouched(130, 95, 25, 20);
+
+    for (double method : { 0.0 /* mog2 */, 1.0 /* knn */ }) {
+        auto motion = makeAlgorithm("motion");
+        fail_unless(motion != nullptr, "motion must be registered");
+
+        // Shadows off here: the vacated area is a dark patch where the model
+        // expects a bright block, which is the very thing shadow suppression
+        // exists to discard. test_motion_shadow_suppression covers that.
+        motion->setParams(motionTuning(method, 0.0));
+
+        const cv::Mat still = scene(size, startsAt);
+        settle(*motion, still, kSettleFrames);
+
+        cv::Mat quiet = still.clone();
+        motion->apply(quiet);
+        const int noise = flagged(quiet, cv::Rect(0, 0, size.width, size.height));
+        fail_unless(noise == 0,
+            "method %d: a settled, still scene reported %d moving pixels",
+            static_cast<int>(method), noise);
+
+        cv::Mat moved = scene(size, movesTo);
+        motion->apply(moved);
+
+        fail_unless(flagged(moved, movesTo) > movesTo.area() / 2,
+            "method %d: only %d of %d pixels flagged where the block moved to",
+            static_cast<int>(method), flagged(moved, movesTo), movesTo.area());
+        fail_unless(flagged(moved, startsAt) > startsAt.area() / 2,
+            "method %d: only %d of %d pixels flagged where the block moved from",
+            static_cast<int>(method), flagged(moved, startsAt), startsAt.area());
+        fail_unless(flagged(moved, untouched) == 0,
+            "method %d: %d pixels flagged in a region nothing moved through",
+            static_cast<int>(method), flagged(moved, untouched));
+    }
+}
+GST_END_TEST
+
+// The analysis runs on a downscaled copy and the mask is scaled back to the
+// frame, so a coordinate slip would report motion in the wrong place entirely.
+// This is the case that would catch it: a frame big enough to trigger the
+// downscale, and a block that crosses to the opposite corner.
+GST_START_TEST(test_motion_maps_a_downscaled_mask_back_onto_the_frame)
+{
+    const cv::Size size(960, 720);            // 2x the 360-row analysis height
+    const cv::Rect startsAt(60, 60, 120, 120);
+    const cv::Rect movesTo(700, 500, 120, 120);
+    const cv::Rect neverTouched(700, 60, 120, 120);
+
+    auto motion = makeAlgorithm("motion");
+    motion->setParams(motionTuning(0.0, 0.0));
+
+    const cv::Mat still = scene(size, startsAt);
+    settle(*motion, still, kSettleFrames);
+
+    cv::Mat moved = scene(size, movesTo);
+    motion->apply(moved);
+
+    fail_unless(moved.rows == size.height && moved.cols == size.width
+                && moved.type() == CV_8UC3,
+        "the frame came back as %dx%d type %d", moved.cols, moved.rows, moved.type());
+
+    fail_unless(flagged(moved, movesTo) > movesTo.area() / 2,
+        "only %d of %d pixels flagged where the block moved to",
+        flagged(moved, movesTo), movesTo.area());
+    fail_unless(flagged(moved, startsAt) > startsAt.area() / 2,
+        "only %d of %d pixels flagged where the block moved from",
+        flagged(moved, startsAt), startsAt.area());
+    fail_unless(flagged(moved, neverTouched) == 0,
+        "%d pixels flagged in the one corner the block never occupied -- the "
+        "upscaled mask is not landing where the analysis found motion",
+        flagged(moved, neverTouched));
+}
+GST_END_TEST
+
+// A shadow is a uniformly dimmed version of the background, and reporting one
+// as an object is the classic false positive. The flag has to make the
+// difference, so the same input is run twice with only that knob moved.
+GST_START_TEST(test_motion_shadow_suppression)
+{
+    const cv::Size size(160, 120);
+    const cv::Rect shaded(40, 40, 60, 40);
+
+    // Grey scene, and a patch at 0.7x of it: same chromaticity, lower
+    // intensity, which is what the shadow test looks for.
+    cv::Mat still(size, CV_8UC3, cv::Scalar(200, 200, 200));
+    cv::Mat shadowed = still.clone();
+    cv::rectangle(shadowed, shaded, cv::Scalar(140, 140, 140), -1);
+
+    int detected[2] = { 0, 0 };
+    for (int shadows = 0; shadows <= 1; ++shadows) {
+        auto motion = makeAlgorithm("motion");
+        motion->setParams(motionTuning(0.0, static_cast<double>(shadows)));
+
+        settle(*motion, still, kSettleFrames);
+
+        cv::Mat frame = shadowed.clone();
+        motion->apply(frame);
+        detected[shadows] = flagged(frame, shaded);
+    }
+
+    fail_unless(detected[0] > shaded.area() / 2,
+        "with shadow detection off a dimmed patch is just foreground, but only "
+        "%d of %d pixels were flagged", detected[0], shaded.area());
+    fail_unless(detected[1] < shaded.area() / 10,
+        "with shadow detection on the dimmed patch should be discarded, but "
+        "%d of %d pixels were still flagged", detected[1], shaded.area());
+}
+GST_END_TEST
+
+// The `background` render mode shows what the model believes the empty scene
+// looks like. It is the diagnostic for "why is it flagging everything", so it
+// has to show the learned scene and not the frame that was just handed in.
+GST_START_TEST(test_motion_can_render_the_learned_background)
+{
+    const cv::Size size(160, 120);
+    const cv::Rect startsAt(20, 20, 30, 30);
+    const cv::Rect movesTo(100, 60, 30, 30);
+
+    auto motion = makeAlgorithm("motion");
+    motion->setParams({ { "method", 0.0 }, { "history", 100.0 }, { "mode", 2.0 } });
+
+    const cv::Mat still = scene(size, startsAt);
+    settle(*motion, still, kSettleFrames);
+
+    // Hand it a frame with the block somewhere else. One frame cannot shift a
+    // settled model, so the answer should still be the scene it learned.
+    cv::Mat moved = scene(size, movesTo);
+    motion->apply(moved);
+
+    fail_unless(moved.rows == size.height && moved.cols == size.width
+                && moved.type() == CV_8UC3,
+        "background mode returned a %dx%d type %d frame",
+        moved.cols, moved.rows, moved.type());
+
+    const double atOldPosition = cv::mean(moved(startsAt))[0];
+    const double atNewPosition = cv::mean(moved(movesTo))[0];
+    fail_unless(atOldPosition > 200.0,
+        "the learned background lost the block that was always there (mean %.1f)",
+        atOldPosition);
+    fail_unless(atNewPosition < 100.0,
+        "the learned background already contains a block seen in one frame "
+        "(mean %.1f) -- this is the input, not the model", atNewPosition);
+}
+GST_END_TEST
+
+// The console builds a combo box from `choices`, so the enum knobs have to
+// arrive over the wire with their options intact -- a schema that is
+// well-formed in memory but loses its choices in serialization renders as an
+// empty dropdown.
+GST_START_TEST(test_motion_schema_reaches_the_wire)
+{
+    const std::string schema = mediaLib_algorithmParams("motion");
+
+    for (const char* key : { "key=method", "key=history", "key=threshold",
+                             "key=shadows", "key=learn-rate", "key=mode" })
+        fail_unless(schema.find(key) != std::string::npos,
+            "motion must expose '%s', got '%s'", key, schema.c_str());
+
+    fail_unless(schema.find("choices=mog2|knn") != std::string::npos,
+        "the subtractor choice must reach the client, got '%s'", schema.c_str());
+    fail_unless(schema.find("choices=overlay|mask|background") != std::string::npos,
+        "the render modes must reach the client, got '%s'", schema.c_str());
+    fail_unless(schema.find("type=bool") != std::string::npos,
+        "the shadow toggle must be typed as a bool, got '%s'", schema.c_str());
+
+    const size_t id = mediaLib_create(SourceType::CAMERA_SOURCE, SinkType::APPLICATION_SINK, "t");
+    fail_unless(mediaLib_setAlgorithms(id, "motion") == errorState::NO_ERR,
+        "motion must be selectable as a chain");
+    fail_unless(mediaLib_setAlgorithmParams(id, "motion", "method=1,threshold=40")
+                    == errorState::NO_ERR,
+        "valid motion parameters must be accepted");
+
+    const std::string values = mediaLib_getAlgorithmParams(id, "motion");
+    fail_unless(values.find("method=1") != std::string::npos,
+        "the subtractor choice did not stick, got '%s'", values.c_str());
+    fail_unless(values.find("threshold=40") != std::string::npos,
+        "the threshold did not stick, got '%s'", values.c_str());
+
+    mediaLib_delete(id);
+}
+GST_END_TEST
+
 Suite* algorithms_suite()
 {
     Suite*   s  = suite_create("algorithms");
@@ -285,5 +527,10 @@ Suite* algorithms_suite()
     tcase_add_test(tc, test_params_survive_a_chain_rebuild);
     tcase_add_test(tc, test_param_api_bounds_checks);
     tcase_add_test(tc, test_framediff_reports_motion_only_where_it_happened);
+    tcase_add_test(tc, test_motion_learns_the_scene_before_flagging_it);
+    tcase_add_test(tc, test_motion_maps_a_downscaled_mask_back_onto_the_frame);
+    tcase_add_test(tc, test_motion_shadow_suppression);
+    tcase_add_test(tc, test_motion_can_render_the_learned_background);
+    tcase_add_test(tc, test_motion_schema_reaches_the_wire);
     return s;
 }

@@ -71,13 +71,48 @@ camera delivers**:
 | `framediff` | 15.06 | 0 |
 | `canny` | 15.07 | 0 |
 
-Read that as a budget statement, not as "these stages are free": the camera was
-delivering 15 fps that afternoon (auto-exposure again — the same mode measured
-20.1 fps for the baseline above, in better light), so each frame had ~66 ms of
-slack and a stage costing a few ms cannot show up. The number that would move
-first is `dropped:`, and it did not. To measure a stage's actual cost, a
-synthetic source is needed — the camera cannot be driven fast enough to expose
-it.
+Re-measured 2026-08-07 in better light, where the same mode delivered 24 fps —
+`motion` is free at that rate too:
+
+| Chain | fps | dropped |
+|---|---|---|
+| (none) | 24.03 | 0 |
+| `framediff` | 24.03 | 0 |
+| `motion` | 24.02 | 0 |
+
+Read both tables as budget statements, not as "these stages are free": each frame
+had 40–66 ms of slack, so a stage costing a few ms cannot show up. The number
+that would move first is `dropped:`, and it did not.
+
+### Cost of a processing stage, measured
+
+The camera cannot be driven fast enough to expose a per-frame cost, so these come
+from timing `Algorithm::apply()` directly over 120 synthetic frames after a
+60-frame warm-up, with the OpenCV pool capped at 3 as the engine caps it (P3).
+Measured 2026-08-07, RelWithDebInfo, CPU.
+
+| Stage | 1280×720 | 1920×1080 |
+|---|---|---|
+| `framediff` | 2.42 ms | 3.43 ms |
+| `motion` (mog2, overlay) | 2.24 ms | 4.42 ms |
+| `motion` (knn, overlay) | 2.20 ms | 4.35 ms |
+| `motion` (mog2, mask) | 1.46 ms | 2.80 ms |
+| *control:* MOG2 driven at full frame | 4.59 ms | 10.70 ms |
+
+The last row is the reason the motion family downscales. Running the subtractor
+at the full frame costs 10.7 ms at 1080p — squarely in the 10–15 ms the note
+below predicted, and a quarter of a 24 fps frame budget spent on one stage.
+Against a 360-row analysis copy the same stage is 4.4 ms, so the subtractor
+itself has stopped scaling with capture resolution and what is left is the resize
+and the full-res draw.
+
+KNN and MOG2 cost the same here, so the choice between them is about scene
+behaviour rather than budget.
+
+Two things fall out of that. Choosing a bigger capture mode no longer makes the
+motion analysis more expensive, only the resize and the blend. And `overlay` mode
+costs ~1.6 ms more than `mask` at 1080p — a full-frame `clone` + `addWeighted`
+that a later pass could narrow to the mask's bounding box.
 
 ## Landed
 
@@ -115,12 +150,19 @@ S (a sitting), M (a session), L (multi-session or needs a design decision).
 
 ### Notes
 
-**Watch out when the motion stages land.** `framediff` is single-channel and
-cheap. Its successors are not: MOG2 background subtraction is ~10–15 ms at 1080p
-and dense optical flow is far worse, and the whole chain runs on the streaming
-thread holding `FrameProcessor::m_mutex` (see P15). Run the analysis on a
-downscaled copy and scale the result back up for drawing — a motion mask does not
-need 1080p — rather than paying full resolution for it.
+**The motion stages downscale for analysis.** `framediff` is single-channel and
+cheap. Its successors are not — the measurement above puts full-frame MOG2 at
+10.6 ms at 1080p, and dense optical flow will be far worse — and the whole chain
+runs on the streaming thread holding `FrameProcessor::m_mutex` (see P15). So
+`motion` runs its subtractor on a 360-row copy and scales the mask back up to
+draw, which more than halves it; a motion mask does not need 1080p. **Every later
+stage in the family should do the same**, and M3's boxes should be found at
+analysis resolution and scaled up, not found at full resolution.
+
+The constant lives in `MotionAlgorithm::kAnalysisRows`. It is deliberately not a
+parameter: an operator who lowers it to buy frame rate silently loses small or
+distant movers, and the measurement above says there is nothing left to buy —
+the subtractor no longer scales with capture resolution.
 
 **P6 — skip the convert when nothing processes.** `source->converter`
 (`videoconvert`) is created in the `PipelineManager` constructor and always

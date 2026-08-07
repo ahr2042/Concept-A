@@ -3,6 +3,7 @@
 
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/ocl.hpp>
+#include <opencv2/video/background_segm.hpp>
 
 namespace {
 
@@ -178,6 +179,180 @@ private:
     double  m_mode        = 0.0;
 };
 
+// Motion by background subtraction: a per-pixel statistical model of what the
+// scene looks like when nothing is happening, and everything that does not fit
+// it is foreground.
+//
+// This is the step up from framediff. A running average holds one number per
+// pixel, so anything that oscillates — foliage, a flickering monitor, sensor
+// noise in a dim room — reads as permanent motion. MOG2 models each pixel as a
+// mixture of Gaussians and KNN as a set of recent samples, so both can hold
+// "this pixel is usually one of these few values" and stay quiet. The cost is
+// real work per pixel, which is what the downscale below pays for.
+//
+// The analysis runs on a downscaled copy and the mask is scaled back up to draw.
+// A motion mask does not need 1080p, and the whole chain runs on the streaming
+// thread holding FrameProcessor::m_mutex — see docs/PERFORMANCE.md. Everything
+// here is CPU: the frame is already in host memory, and one stage does not
+// justify a second GPU runtime alongside the detector's Vulkan.
+class MotionAlgorithm : public Algorithm
+{
+public:
+    const char* name() const override { return "motion"; }
+
+    void setParams(const AlgorithmParams& p) override
+    {
+        const double wasMethod = m_method;
+        readParam(p, "method", m_method);
+        readParam(p, "history", m_history);
+        readParam(p, "threshold", m_threshold);
+        readParam(p, "shadows", m_shadows);
+        readParam(p, "learn-rate", m_learnRate);
+        readParam(p, "mode", m_mode);
+
+        // Switching subtractor needs a different object, so the learned scene is
+        // necessarily lost. The rest are live setters — retuning a threshold
+        // mid-stream must not throw away a background that took seconds to
+        // learn, which a rebuild-on-every-change would do.
+        if (m_method != wasMethod)
+            m_subtractor.release();
+        else
+            retune();
+    }
+
+    void apply(cv::Mat& frame) override
+    {
+        if (m_subtractor.empty()) {
+            m_subtractor = static_cast<int>(m_method) == 1
+                ? cv::Ptr<cv::BackgroundSubtractor>(cv::createBackgroundSubtractorKNN())
+                : cv::Ptr<cv::BackgroundSubtractor>(cv::createBackgroundSubtractorMOG2());
+            retune();
+        }
+
+        // INTER_AREA rather than a cheaper filter: it averages the pixels it
+        // discards, where nearest-neighbour would alias fine texture into
+        // shimmer that the subtractor then reports as motion.
+        const bool downscale = frame.rows > kAnalysisRows;
+        if (downscale) {
+            const double s = static_cast<double>(kAnalysisRows) / frame.rows;
+            cv::resize(frame, m_small, cv::Size(), s, s, cv::INTER_AREA);
+        }
+        const cv::Mat& input = downscale ? m_small : frame;
+
+        // Both subtractors reinitialize themselves if the geometry changes, so a
+        // caps change costs a relearn rather than an exception.
+        m_subtractor->apply(input, m_raw, learningRate());
+
+        // Shadows come back as 127 rather than 255. Cutting above that is what
+        // makes the flag useful — a shadow sweeping across the floor is not an
+        // object — and is a no-op when shadow detection is off, since the mask
+        // is then already binary.
+        cv::threshold(m_raw, m_fg, 200.0, 255.0, cv::THRESH_BINARY);
+        // An empty kernel is a 3x3 rect. Opening erases the isolated speckle
+        // every subtractor produces without eating into a real blob.
+        cv::morphologyEx(m_fg, m_fg, cv::MORPH_OPEN, cv::Mat());
+
+        if (static_cast<int>(m_mode) == 2) {
+            renderBackground(frame);
+            return;
+        }
+
+        // Nearest-neighbour on the way back up, deliberately: the mask is binary
+        // and interpolation would produce in-between values that setTo() then
+        // treats as foreground anyway. Blocky edges are honest about the
+        // resolution the decision was actually made at.
+        const cv::Mat& mask = upscaledMask(frame.size());
+
+        if (static_cast<int>(m_mode) == 1) {
+            cv::cvtColor(mask, frame, cv::COLOR_GRAY2BGR);
+            return;
+        }
+
+        // overlay — blend rather than paint, so the operator can still see what
+        // is moving and not just that something is. copyTo into a kept buffer
+        // rather than clone(): this is the default mode and the copy is
+        // full-resolution, so it is the one allocation worth not repeating.
+        frame.copyTo(m_tinted);
+        m_tinted.setTo(cv::Scalar(0, 0, 255), mask);
+        cv::addWeighted(m_tinted, 0.45, frame, 0.55, 0.0, frame);
+    }
+
+private:
+    // 360 rows is enough to separate a person from the scene at any capture size
+    // this engine offers, and it caps the subtractor's cost at a constant no
+    // matter what the camera delivers.
+    static constexpr int kAnalysisRows = 360;
+
+    // 0 would mean "freeze the model" to OpenCV, which is not what an operator
+    // dragging a slider to the bottom expects; -1 is its automatic rate, derived
+    // from `history`.
+    double learningRate() const { return m_learnRate <= 0.0 ? -1.0 : m_learnRate; }
+
+    // The two subtractors do not share a tuning interface, and their thresholds
+    // are not even the same quantity: MOG2's is a squared Mahalanobis distance
+    // (default 16), KNN's a squared pixel distance (default 400). The x25 keeps
+    // one knob honest — both defaults land on the same slider position, and the
+    // ends of the range mean the same thing to both.
+    void retune()
+    {
+        if (m_subtractor.empty())
+            return;
+        const int  history = static_cast<int>(m_history);
+        const bool shadows = m_shadows >= 0.5;
+
+        if (auto mog2 = m_subtractor.dynamicCast<cv::BackgroundSubtractorMOG2>()) {
+            mog2->setHistory(history);
+            mog2->setVarThreshold(m_threshold);
+            mog2->setDetectShadows(shadows);
+        } else if (auto knn = m_subtractor.dynamicCast<cv::BackgroundSubtractorKNN>()) {
+            knn->setHistory(history);
+            knn->setDist2Threshold(m_threshold * 25.0);
+            knn->setDetectShadows(shadows);
+        }
+    }
+
+    const cv::Mat& upscaledMask(cv::Size full)
+    {
+        if (m_fg.size() == full)
+            return m_fg;
+        cv::resize(m_fg, m_mask, full, 0, 0, cv::INTER_NEAREST);
+        return m_mask;
+    }
+
+    // What the model currently believes the empty scene looks like. The most
+    // useful diagnostic the family has: "why is it flagging everything" is
+    // almost always visible here as a background that never settled.
+    void renderBackground(cv::Mat& frame)
+    {
+        m_subtractor->getBackgroundImage(m_background);
+        if (m_background.empty())
+            return;   // nothing learned yet; leave the scene alone
+        if (m_background.size() == frame.size())
+            m_background.copyTo(frame);
+        else
+            cv::resize(m_background, frame, frame.size(), 0, 0, cv::INTER_LINEAR);
+    }
+
+    cv::Ptr<cv::BackgroundSubtractor> m_subtractor;
+
+    // Held across frames rather than declared in apply(): cv::Mat reuses its
+    // allocation when the geometry matches, so these are buffers allocated once
+    // instead of a malloc/free pair each per frame on the streaming thread.
+    cv::Mat m_small;        // downscaled analysis copy
+    cv::Mat m_raw;          // subtractor output, shadows still at 127
+    cv::Mat m_fg;           // cleaned binary mask, analysis size
+    cv::Mat m_mask;         // ... scaled back up to the frame
+    cv::Mat m_tinted;       // overlay scratch, full resolution
+    cv::Mat m_background;
+
+    double m_method    = 0.0;     // 0 = MOG2, 1 = KNN
+    double m_history   = 500.0;
+    double m_threshold = 16.0;
+    double m_shadows   = 1.0;
+    double m_learnRate = 0.0;     // 0 = automatic
+    double m_mode      = 0.0;
+};
+
 std::vector<AlgorithmParam> noParams()
 {
     return {};
@@ -192,6 +367,24 @@ std::vector<AlgorithmParam> frameDiffParams()
         { "decay", "BACKGROUND DECAY", AlgorithmParam::Type::Float, 0.001, 0.5, 0.001, 0.05, {} },
         { "mode", "RENDER MODE", AlgorithmParam::Type::Enum, 0.0, 2.0, 1.0, 0.0,
           { "overlay", "mask", "heat" } },
+    };
+}
+
+std::vector<AlgorithmParam> motionParams()
+{
+    return {
+        { "method", "SUBTRACTOR", AlgorithmParam::Type::Enum, 0.0, 1.0, 1.0, 0.0,
+          { "mog2", "knn" } },
+        // How many frames the model remembers. At 20 fps the 500 default is
+        // about 25 seconds of scene, which is also the automatic learning rate.
+        { "history", "HISTORY (FRAMES)", AlgorithmParam::Type::Int, 50.0, 2000.0, 10.0, 500.0, {} },
+        // Distance a pixel has to sit from the model to count as foreground.
+        // Lower finds more and flags more noise.
+        { "threshold", "FOREGROUND THRESHOLD", AlgorithmParam::Type::Int, 4.0, 200.0, 1.0, 16.0, {} },
+        { "shadows", "DETECT SHADOWS", AlgorithmParam::Type::Bool, 0.0, 1.0, 1.0, 1.0, {} },
+        { "learn-rate", "LEARN RATE (0 = AUTO)", AlgorithmParam::Type::Float, 0.0, 0.5, 0.001, 0.0, {} },
+        { "mode", "RENDER MODE", AlgorithmParam::Type::Enum, 0.0, 2.0, 1.0, 0.0,
+          { "overlay", "mask", "background" } },
     };
 }
 
@@ -223,6 +416,10 @@ const std::vector<AlgorithmInfo>& algorithmRegistry()
         { "framediff", "Motion by difference against a running average of the scene",
           &frameDiffParams,
           [] { return std::unique_ptr<Algorithm>(new FrameDiffAlgorithm()); } },
+
+        { "motion", "Background subtraction that learns the scene, MOG2 or KNN",
+          &motionParams,
+          [] { return std::unique_ptr<Algorithm>(new MotionAlgorithm()); } },
 
         // Starts idle; FrameProcessor hands it the selected model right after.
         // Its model and thresholds travel on the dedicated `model` /
