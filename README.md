@@ -55,9 +55,9 @@ interrupts operations; errors surface as log entries and tile badges.
 | Area | What works |
 |---|---|
 | **Streaming** | Camera → viewport, end-to-end: `create → set-device → algos → start`, frames over a per-stream zero-copy unixfd socket into an embedded GL viewport |
-| **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`, `framediff`, `detect`) applied in place via a pad probe — toggled live from the console |
+| **Processing chain** | Runtime-selectable OpenCV algorithms (`grayscale`, `canny`, `framediff`, `motion`, `detect`) applied in place via a pad probe — toggled live from the console |
 | **Algorithm parameters** | Each stage describes its own knobs (`algo-params`); the console generates sliders/toggles from that schema and retunes a running stream with `algo-set` |
-| **Motion detection** | `framediff` — temporal difference against a running average of the scene, with sensitivity, background decay and overlay/mask/heat rendering |
+| **Motion detection** | `framediff` — temporal difference against a running average of the scene, with sensitivity, background decay and overlay/mask/heat rendering. `motion` — MOG2 or KNN background subtraction, which learns the scene and so holds still through foliage, flicker and lighting drift that a running average reports as movement; tunable history, foreground threshold, shadow suppression and learning rate, rendered as overlay, mask, or the learned background itself. The analysis runs on a 360-row copy and the mask is scaled back up, which keeps it at ≈4.4 ms/frame at 1080p against ≈10.7 ms for the same subtractor at full resolution |
 | **AI inference** | YOLO-family ONNX object detection (`detect`) through OpenCV DNN: model picker and confidence slider in the console, boxes drawn into the frame, model swappable mid-stream. Inference runs on a worker thread and the probe overlays the newest result, so detection cost never throttles the stream |
 | **Inference telemetry** | Real per-pipeline detector stats over the control protocol (`stats <id>`) — latency chart, TOTAL_OBJECTS / AVG_CONFIDENCE tiles, and detections in the event log |
 | **Acceleration** | Backends auto-detected at daemon start (CPU / Vulkan / CUDA) and reported over the protocol (`accelerators`); the console renders a capability-driven selector — only detected engines are offered, `AUTO` by default, CPU when no GPU. A per-deploy CPU/GPU choice threads through the pipeline (`accel <id> <sel>`) and always resolves to a runnable backend. **The YOLO detector runs on the GPU via ncnn + Vulkan** behind an `IInferenceBackend` seam — validated on a Radeon RX 6700-series (RADV): **≈24 ms/frame vs ≈57 ms on CPU** for yolov5n at 640² (~2.4×). Enabled by `scripts/build-ncnn.sh` (`-DWITH_GPU`); the weights are converted FP16→FP32→pnnx by `scripts/fetch-models.sh` (plain `onnx2ncnn` yields a graph that crashes ncnn's Vulkan path). Colourspace convert stays on the CPU (≈1 ms). CUDA is a compiled placeholder for a future NVIDIA card |
@@ -154,7 +154,7 @@ interactively: run the engine without arguments for a REPL, or
 | `create <src> <snk> <name>` | `OK id=N` | Allocate a pipeline (e.g. `create camera app cam0`) |
 | `devices <id>` | device & caps listing | Enumerate V4L2 devices with all capture modes |
 | `set-device <id> <dev> <cap>` | `OK` | Bind a device + capture mode to the source |
-| `algos-list` | `OK grayscale,canny,framediff,detect` | Available processing algorithms |
+| `algos-list` | `OK grayscale,canny,framediff,motion,detect` | Available processing algorithms |
 | `algos <id> <csv>` | `OK` | Set the processing chain (empty CSV disables; an unknown name is rejected) |
 | `algo-params <algo>` | parameter schema | Describe an algorithm's knobs, enough to build a control from |
 | `algo-set <id> <algo> <k=v,…>` | `OK` | Tune an algorithm (e.g. `algo-set 0 canny low=90`); values are clamped |
@@ -298,9 +298,12 @@ docs/
    GPU colour-convert segment is disabled — `glupload!glcolorconvert!gldownload`
    delivered all-black frames on this RADV/GL stack, so convert stays on the CPU;
    (b) fill in the CUDA placeholder when an NVIDIA card lands.
-3. **RTSP source** — first non-V4L2 protocol chip.
-4. **Recording** — REC / REC ALL to disk with the DVR transport bar.
-5. **Frame-integrity accounting** — drop counters and aggregate score on Analytics.
+3. **Motion & surveillance stages** — `framediff` and `motion` have landed; next are
+   motion regions with bounding boxes and telemetry, intrusion zones, and tracking
+   with persistent IDs and dwell time.
+4. **RTSP source** — first non-V4L2 protocol chip.
+5. **Recording** — REC / REC ALL to disk with the DVR transport bar.
+6. **Frame-integrity accounting** — drop counters and aggregate score on Analytics.
 
 ## License
 
