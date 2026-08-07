@@ -378,10 +378,14 @@ BackendService::BackendService(QObject* parent)
     });
     connect(m_worker, &BackendWorker::sessionStopped, this, [this](int id) {
         logInfo("STREAM", QStringLiteral("session %1 stopped").arg(id));
+        if (id == m_primarySession)
+            m_primarySession = -1;
         emit sessionStopped(id);
     });
     connect(m_worker, &BackendWorker::sessionFailed, this, [this](int id, const QString& err) {
         logErr("STREAM", QStringLiteral("session %1 failed: %2").arg(id).arg(err));
+        if (id == m_primarySession)
+            m_primarySession = -1;
         emit sessionFailed(id, err);
     });
     connect(m_worker, &BackendWorker::modelsReady, this, [this](const QVector<DetectorModel>& m) {
@@ -658,6 +662,15 @@ void BackendService::setDetectorSettings(const QString& model, double confidence
     m_config.nms           = nms;
     m_config.drawBoxes     = drawBoxes;
     emit configChanged(m_config);
+}
+
+int BackendService::deployWorkingConfig(const QString& name, bool screenSink)
+{
+    DeploySpec spec = m_config;
+    spec.name       = name;
+    spec.screenSink = screenSink;
+    m_primarySession = deploy(spec);
+    return m_primarySession;
 }
 
 int BackendService::deploy(const DeploySpec& spec)

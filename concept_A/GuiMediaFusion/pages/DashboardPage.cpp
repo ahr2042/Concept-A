@@ -333,9 +333,7 @@ void DashboardPage::onStart()
     // Deploy what the working config says, not what this page's widgets say.
     // The two deploy paths used to read their own widgets and so could disagree
     // — this one never sent the acceleration choice at all.
-    BackendService::DeploySpec spec = m_service->config();
-    spec.name = QStringLiteral("dashboard");
-    m_sessionId = m_service->deploy(spec);
+    m_sessionId = m_service->deployWorkingConfig(QStringLiteral("dashboard"));
     m_startBtn->setEnabled(false);
 }
 

@@ -146,6 +146,21 @@ public:
     void setDetectorSettings(const QString& model, double confidence,
                              double nms, bool drawBoxes);
 
+    // Deploy the working config, and remember the session it produced as the
+    // primary one. Both surfaces use this: the Dashboard's START and the
+    // Pipeline page's DEPLOY are the same act on the same configuration.
+    int deployWorkingConfig(const QString& name, bool screenSink = false);
+
+    // The session the working config is currently running as, or -1.
+    //
+    // It has to live here rather than in a page. The chain is edited on the
+    // Pipeline page but the stream is often started from the Dashboard, and a
+    // page that only knew about sessions it launched itself would silently stop
+    // retuning a live stream that the other page had started. MultiGrid's
+    // per-tile sessions are deliberately not this — they are their own
+    // pipelines and keep their own ids.
+    int primarySession() const { return m_primarySession; }
+
     // configuration (persisted by SettingsPage via QSettings)
     QString controlSocketPath() const { return m_socketPath; }
     QString backendBinary() const     { return m_binary; }
@@ -257,5 +272,6 @@ private:
     QVector<AcceleratorOption> m_accelerators;
     QString                m_accelSelection = QStringLiteral("auto");
     DeploySpec             m_config;                // the working configuration
+    int                    m_primarySession = -1;   // ... and the session running it
     QHash<int, QString>    m_lastDetections;   // sessionId → last logged label set
 };

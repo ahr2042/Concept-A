@@ -237,10 +237,14 @@ QWidget* PipelinePage::buildPropertiesPanel()
             [this](const QString&, const AlgorithmSettings&) { publishChain(); });
     // A knob committed on a running session takes effect within a frame or two;
     // without one the value simply waits in the config for the next deploy.
+    //
+    // primarySession(), not this page's own id: the chain is edited here but the
+    // stream is just as often started from the Dashboard, and keying off the
+    // local id would silently stop retuning in exactly that case.
     connect(m_chain, &vos::ChainEditor::stageRetuned, this,
             [this](const QString& algo, const QVariantMap& values) {
-        if (m_sessionId >= 0)
-            m_service->setAlgorithmParams(m_sessionId, algo, values);
+        if (m_service->primarySession() >= 0)
+            m_service->setAlgorithmParams(m_service->primarySession(), algo, values);
     });
 
     procLay->addWidget(vos::makeHSeparator(proc));
@@ -467,8 +471,10 @@ void PipelinePage::onDetectorSettingChanged()
     const QString model = m_modelBox->currentData().toString();
     const double  conf  = m_confSlider->value() / 100.0;
     m_service->setDetectorSettings(model, conf, m_service->config().nms, true);
-    if (m_sessionId >= 0)
-        m_service->setDetector(m_sessionId, model, conf, m_service->config().nms, true);
+    // Same reasoning as the chain knobs: whichever page started the stream.
+    if (m_service->primarySession() >= 0)
+        m_service->setDetector(m_service->primarySession(), model, conf,
+                               m_service->config().nms, true);
 }
 
 void PipelinePage::onDeploy()
@@ -478,10 +484,8 @@ void PipelinePage::onDeploy()
     // Deploy the working config rather than this page's widgets. It used to
     // build its own spec here, which is why it never sent the confidence.
     publishChain();
-    BackendService::DeploySpec spec = m_service->config();
-    spec.screenSink = m_sinkScreen->isChecked();
-    spec.name       = QStringLiteral("pipeline-editor");
-    m_sessionId = m_service->deploy(spec);
+    m_sessionId = m_service->deployWorkingConfig(QStringLiteral("pipeline-editor"),
+                                                 m_sinkScreen->isChecked());
     m_deployBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("DEPLOYING…"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kWarn));
