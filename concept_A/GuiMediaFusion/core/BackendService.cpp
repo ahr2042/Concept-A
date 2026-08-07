@@ -622,6 +622,44 @@ void BackendService::refreshAccelerators()
     QMetaObject::invokeMethod(m_worker, &BackendWorker::queryAccelerators, Qt::QueuedConnection);
 }
 
+// ── The working configuration ────────────────────────────────────────────────
+//
+// Three setters rather than one generic mutator, because they mirror who owns
+// what: the rail sets the source, the Pipeline page sets the chain and the
+// inference settings. Each guards on equality so a page that echoes the config
+// back into its widgets cannot start a signal loop.
+
+void BackendService::setSource(int deviceIndex, int capIndex)
+{
+    if (m_config.deviceIndex == deviceIndex && m_config.capIndex == capIndex)
+        return;
+    m_config.deviceIndex = deviceIndex;
+    m_config.capIndex    = capIndex;
+    emit configChanged(m_config);
+}
+
+void BackendService::setChain(const QString& algosCsv, const AlgorithmSettings& params)
+{
+    if (m_config.algosCsv == algosCsv && m_config.algoParams == params)
+        return;
+    m_config.algosCsv   = algosCsv;
+    m_config.algoParams = params;
+    emit configChanged(m_config);
+}
+
+void BackendService::setDetectorSettings(const QString& model, double confidence,
+                                         double nms, bool drawBoxes)
+{
+    if (m_config.detectorModel == model && qFuzzyCompare(m_config.confidence, confidence)
+        && qFuzzyCompare(m_config.nms, nms) && m_config.drawBoxes == drawBoxes)
+        return;
+    m_config.detectorModel = model;
+    m_config.confidence    = confidence;
+    m_config.nms           = nms;
+    m_config.drawBoxes     = drawBoxes;
+    emit configChanged(m_config);
+}
+
 int BackendService::deploy(const DeploySpec& spec)
 {
     const int sessionId = m_nextSession++;

@@ -386,28 +386,38 @@ void PipelinePage::onAlgorithms(const QStringList& algos)
     m_canvas->setNodeTitle(1, QStringLiteral("PASSTHROUGH"));
 }
 
-void PipelinePage::onDeploy()
+// Mirror this page's chain widgets into the shared working config.
+void PipelinePage::publishChain()
 {
-    if (!m_deviceBox->currentData().isValid())
-        return;
-    BackendService::DeploySpec spec;
-    spec.deviceIndex = m_deviceBox->currentData().toInt();
-    spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
-    QStringList active;
+    QStringList       active;
+    AlgorithmSettings params;
     for (QCheckBox* b : m_algoBoxes) {
         if (!b->isChecked())
             continue;
         const QString algo = b->text().toLower();
         active << algo;
         if (auto* panel = m_algoPanels.value(algo, nullptr))
-            spec.algoParams.insert(algo, panel->values());
+            params.insert(algo, panel->values());
     }
-    spec.algosCsv   = active.join(',');
+    m_service->setChain(active.join(','), params);
+    if (m_modelBox->isEnabled())
+        m_service->setDetectorSettings(m_modelBox->currentData().toString(),
+                                       m_service->config().confidence,
+                                       m_service->config().nms, true);
+}
+
+void PipelinePage::onDeploy()
+{
+    if (!m_deviceBox->currentData().isValid())
+        return;
+    // Deploy the working config rather than this page's widgets. It used to
+    // build its own spec here, which is why it never sent the confidence.
+    m_service->setSource(m_deviceBox->currentData().toInt(),
+                         m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0);
+    publishChain();
+    BackendService::DeploySpec spec = m_service->config();
     spec.screenSink = m_sinkScreen->isChecked();
     spec.name       = QStringLiteral("pipeline-editor");
-    if (m_modelBox->isEnabled())
-        spec.detectorModel = m_modelBox->currentData().toString();
-    spec.accelSelection = m_service->accelSelection();
     m_sessionId = m_service->deploy(spec);
     m_deployBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("DEPLOYING…"));

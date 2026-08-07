@@ -33,6 +33,7 @@ private slots:
     void onAlgorithms(const QStringList& algos);
     void onModels(const QVector<DetectorModel>& models);
     void onDeploy();
+    void publishChain();
     void onHalt();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
     void onSessionStopped(int sessionId);

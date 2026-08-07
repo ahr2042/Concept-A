@@ -59,6 +59,7 @@ private:
     QWidget* buildConfigPanel();
     QString           algosCsv() const;
     AlgorithmSettings algoParams() const;
+    void              publishSource();
     // Enables/checks the GPU_ACCELERATION toggle from detected backends + the
     // current selection (disabled + off when no GPU is present).
     void     refreshAccelToggle();

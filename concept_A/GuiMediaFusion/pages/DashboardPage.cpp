@@ -152,7 +152,9 @@ QWidget* DashboardPage::buildConfigPanel()
         if (idx >= 0 && idx < m_devices.size())
             for (const CapInfo& c : m_devices[idx].caps)
                 m_capsBox->addItem(c.label, c.index);
+        publishSource();
     });
+    connect(m_capsBox, &QComboBox::currentIndexChanged, this, [this] { publishSource(); });
 
     outer->addWidget(vos::capsLabel(QStringLiteral("PROCESSING CHAIN (OPENCV)"), 8, panel));
     auto* algoHost = new QWidget(panel);
@@ -339,6 +341,8 @@ void DashboardPage::onAlgorithms(const QStringList& algos)
         cb->setToolTip(m_service->algorithmSummary(a));
         m_algoBoxes.append(cb);
         host->layout()->addWidget(cb);
+        connect(cb, &QCheckBox::toggled, this,
+                [this] { m_service->setChain(algosCsv(), algoParams()); });
 
         // Controls for whatever knobs this algorithm declares, hidden until the
         // stage is actually selected so the panel does not fill with sliders
@@ -362,6 +366,7 @@ void DashboardPage::onAlgorithmParamsChanged(const QString& algo, const QVariant
 {
     if (m_sessionId >= 0)
         m_service->setAlgorithmParams(m_sessionId, algo, values);
+    m_service->setChain(algosCsv(), algoParams());
 }
 
 // Values for every algorithm currently ticked — an unticked stage is not in the
@@ -408,8 +413,11 @@ void DashboardPage::onModels(const QVector<DetectorModel>& models)
 
 void DashboardPage::onDetectorSettingChanged()
 {
-    // Only meaningful while a session is live; otherwise the values are picked
-    // up by the next deploy.
+    if (m_modelBox->isEnabled())
+        m_service->setDetectorSettings(m_modelBox->currentData().toString(),
+                                       m_confSlider->value() / 100.0, 0.45, true);
+    // Pushing to a live session is separate: without one the values simply wait
+    // in the config for the next deploy.
     if (m_sessionId < 0 || !m_modelBox->isEnabled())
         return;
     m_service->setDetector(m_sessionId, m_modelBox->currentData().toString(),
@@ -472,20 +480,26 @@ void DashboardPage::refreshAccelToggle()
         : QStringLiteral("No GPU detected — CPU only."));
 }
 
+// Mirror this page's source widgets into the shared working config. Named
+// rather than inlined because two widgets feed it.
+void DashboardPage::publishSource()
+{
+    if (!m_deviceBox->currentData().isValid())
+        return;
+    m_service->setSource(m_deviceBox->currentData().toInt(),
+                         m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0);
+}
+
 void DashboardPage::onStart()
 {
     if (m_deviceBox->count() == 0 || !m_deviceBox->currentData().isValid())
         return;
-    BackendService::DeploySpec spec;
-    spec.deviceIndex = m_deviceBox->currentData().toInt();
-    spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
-    spec.algosCsv    = algosCsv();
-    spec.algoParams  = algoParams();
-    spec.name        = QStringLiteral("dashboard");
-    if (m_modelBox->isEnabled()) {
-        spec.detectorModel = m_modelBox->currentData().toString();
-        spec.confidence    = m_confSlider->value() / 100.0;
-    }
+    // Deploy what the working config says, not what this page's widgets say.
+    // The two deploy paths used to read their own widgets and so could disagree
+    // — this one never sent the acceleration choice at all.
+    publishSource();
+    BackendService::DeploySpec spec = m_service->config();
+    spec.name = QStringLiteral("dashboard");
     m_sessionId = m_service->deploy(spec);
     m_startBtn->setEnabled(false);
 }

@@ -125,6 +125,27 @@ public:
     explicit BackendService(QObject* parent = nullptr);
     ~BackendService() override;
 
+    // ── The working configuration ─────────────────────────────────────────
+    //
+    // The pipeline the operator is currently assembling. This used to live in
+    // each page's widget tree, which is why the same controls existed on two
+    // pages at once — and why the two deploy paths could quietly disagree: the
+    // Dashboard never sent the acceleration choice and the Pipeline page never
+    // sent the confidence.
+    //
+    // One document now, with each surface editing its own slice: the SideRail
+    // owns the source, the Pipeline page owns the chain and the inference
+    // settings, and the Dashboard only reads it (to summarise the chain, and to
+    // START what Pipeline configured). `name` and `screenSink` are not part of
+    // it — they belong to an individual deploy, and MultiGrid still builds its
+    // own spec per tile because each tile is its own pipeline.
+    const DeploySpec& config() const { return m_config; }
+
+    void setSource(int deviceIndex, int capIndex);
+    void setChain(const QString& algosCsv, const AlgorithmSettings& params);
+    void setDetectorSettings(const QString& model, double confidence,
+                             double nms, bool drawBoxes);
+
     // configuration (persisted by SettingsPage via QSettings)
     QString controlSocketPath() const { return m_socketPath; }
     QString backendBinary() const     { return m_binary; }
@@ -136,7 +157,12 @@ public:
     void    setAccelSelection(const QString& s) {
         if (m_accelSelection == s) return;
         m_accelSelection = s;
+        // Also the config's, so there is one source of truth for what the next
+        // deploy will ask for. Both signals fire: the Settings radios listen for
+        // the specific one, the pages for the general one.
+        m_config.accelSelection = s;
         emit accelSelectionChanged(s);             // keep the Settings radios + Dashboard toggle in sync
+        emit configChanged(m_config);
     }
 
     DaemonState state() const { return m_state; }
@@ -193,6 +219,9 @@ signals:
     void modelsChanged(const QVector<DetectorModel>& models);
     void acceleratorsChanged(const QVector<AcceleratorOption>& accelerators);
     void accelSelectionChanged(const QString& selection);
+    // The working config changed, whoever changed it. Surfaces that show part of
+    // it (the rail's combos, the Dashboard's chain summary) refresh from here.
+    void configChanged(const BackendService::DeploySpec& config);
     void detectorChanged(int sessionId, bool ok, const QString& detail);
     void inferenceStatsChanged(int sessionId, const InferenceSnapshot& snapshot);
 
@@ -227,5 +256,6 @@ private:
     QVector<DetectorModel> m_models;
     QVector<AcceleratorOption> m_accelerators;
     QString                m_accelSelection = QStringLiteral("auto");
+    DeploySpec             m_config;                // the working configuration
     QHash<int, QString>    m_lastDetections;   // sessionId → last logged label set
 };
