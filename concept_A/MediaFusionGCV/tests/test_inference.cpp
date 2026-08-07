@@ -70,11 +70,12 @@ GST_END_TEST
 GST_START_TEST(test_inference_api_bounds_checks)
 {
     const size_t bogus = 9999;
-    InferenceStats stats;
+    std::vector<InferenceStats> stats;
 
     fail_unless(mediaLib_setDetectorModel(bogus, "x")     == errorState::NULLPTR_ERR, "model");
     fail_unless(mediaLib_setDetectorParams(bogus, 0.5f, 0.5f, true) == errorState::NULLPTR_ERR, "params");
     fail_unless(mediaLib_getInferenceStats(bogus, stats)  == errorState::NULLPTR_ERR, "stats");
+    fail_unless(stats.empty(), "a bad id must not leave stats behind");
 }
 GST_END_TEST
 
@@ -87,10 +88,20 @@ GST_START_TEST(test_params_without_model_and_stats_absent)
     fail_unless(mediaLib_setDetectorParams(id, 0.4f, 0.5f, true) == errorState::NO_ERR,
         "thresholds must be settable before a model is chosen");
 
-    InferenceStats stats;
+    std::vector<InferenceStats> stats;
     errorState r = mediaLib_getInferenceStats(id, stats);
     fail_unless(r == errorState::NOT_IMPLEMENTED_YET_ERR,
         "a chain without 'detect' must report NOT_IMPLEMENTED_YET_ERR, got %d", (int)r);
+    fail_unless(stats.empty(), "a chain with nothing to report must return no blocks");
+
+    // Plain pixel ops are not "no chain" -- they are a chain with nothing to
+    // say, and must be reported the same way rather than as an error.
+    fail_unless(mediaLib_setAlgorithms(id, "grayscale,motion") == errorState::NO_ERR,
+        "a non-reporting chain must be selectable");
+    r = mediaLib_getInferenceStats(id, stats);
+    fail_unless(r == errorState::NOT_IMPLEMENTED_YET_ERR,
+        "a chain of non-reporting stages must report NOT_IMPLEMENTED_YET_ERR, got %d", (int)r);
+    fail_unless(stats.empty(), "non-reporting stages must not produce blocks");
 
     mediaLib_delete(id);
 }
@@ -210,6 +221,47 @@ GST_START_TEST(test_accel_api)
 }
 GST_END_TEST
 
+// Telemetry is reported per stage rather than "whichever stage answers first".
+// The old accessor returned the first reporting stage and dropped the rest, so a
+// chain holding two of them showed one and gave no sign the other existed.
+//
+// Note what this can and cannot prove today: `detect` is still the only stage
+// that implements snapshotStats(), so the two-reporting-stages case cannot be
+// exercised here. What is checked is that the plumbing carries a list, names
+// every block, and keeps chain order — the parts that would have to be rebuilt
+// otherwise. The genuine two-stage assertion belongs with the stage that adds
+// the second reporter.
+GST_START_TEST(test_stats_are_reported_per_stage)
+{
+    const size_t id = mediaLib_create(SourceType::CAMERA_SOURCE, SinkType::APPLICATION_SINK, "t_stages");
+
+    // A reporting stage sat between two silent ones: the block must come back
+    // named, and the silent neighbours must not produce empty blocks.
+    fail_unless(mediaLib_setAlgorithms(id, "grayscale,detect,motion") == errorState::NO_ERR,
+        "the chain must be selectable");
+
+    std::vector<InferenceStats> stats;
+    const errorState r = mediaLib_getInferenceStats(id, stats);
+    fail_unless(r == errorState::NO_ERR,
+        "a chain containing 'detect' must report stats, got %d", (int)r);
+    fail_unless(stats.size() == 1,
+        "expected one reporting stage in 'grayscale,detect,motion', got %zu", stats.size());
+    fail_unless(stats.front().stage == "detect",
+        "the block must name the stage that produced it, got '%s'",
+        stats.front().stage.c_str());
+
+    // Rebuilding the chain has to republish what the poll reads, or telemetry
+    // would keep describing a chain that is no longer running.
+    fail_unless(mediaLib_setAlgorithms(id, "canny") == errorState::NO_ERR,
+        "the chain must be replaceable");
+    fail_unless(mediaLib_getInferenceStats(id, stats) == errorState::NOT_IMPLEMENTED_YET_ERR,
+        "after dropping 'detect' the pipeline must report nothing");
+    fail_unless(stats.empty(), "a replaced chain left stale blocks behind");
+
+    mediaLib_delete(id);
+}
+GST_END_TEST
+
 Suite* inference_suite()
 {
     Suite* s = suite_create("inference");
@@ -224,6 +276,7 @@ Suite* inference_suite()
     tcase_add_test(tc, test_unknown_model_is_rejected);
     tcase_add_test(tc, test_inference_api_bounds_checks);
     tcase_add_test(tc, test_params_without_model_and_stats_absent);
+    tcase_add_test(tc, test_stats_are_reported_per_stage);
     tcase_add_test(tc, test_model_registry_entries_are_resolvable);
     tcase_add_test(tc, test_detector_runs_when_a_model_is_installed);
     tcase_add_test(tc, test_accelerators_detection_invariants);

@@ -22,6 +22,11 @@ struct Detection
 
 struct InferenceStats
 {
+    // Which stage produced this. A chain can hold more than one stage that
+    // reports — an object detector and a motion stage, say — and their numbers
+    // mean different things, so a block without a name on it is not readable.
+    std::string stage;                 // algorithm wire name, e.g. "detect"
+
     bool        modelLoaded = false;   // a net is resident and usable
     std::string modelName;             // "" when no model is selected
     std::string lastError;             // load/run failure, "" when healthy

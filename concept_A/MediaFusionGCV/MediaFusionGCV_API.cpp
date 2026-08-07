@@ -345,11 +345,15 @@ const char* mediaLib_availableModels()
 	return listing.c_str();
 }
 
-errorState mediaLib_getInferenceStats(size_t pipelineId, InferenceStats& stats)
+errorState mediaLib_getInferenceStats(size_t pipelineId, std::vector<InferenceStats>& stats)
 {
+	stats.clear();
 	if (pipelineId >= pipelines.size() || pipelines[pipelineId] == nullptr)
 		return errorState::NULLPTR_ERR;
-	if (!pipelines[pipelineId]->inferenceStats(stats))
+	stats = pipelines[pipelineId]->stageStats();
+	// An empty chain, or one of plain pixel ops, is a normal state rather than a
+	// failure — the caller reports "nothing to say" instead of an error.
+	if (stats.empty())
 		return errorState::NOT_IMPLEMENTED_YET_ERR;
 	return errorState::NO_ERR;
 }

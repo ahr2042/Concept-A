@@ -106,7 +106,7 @@ static std::string helpText()
         << "  models                            -- lists the installed ONNX models\n"
         << "  model 0 yolov5n                   -- loads one into pipeline 0\n"
         << "  algos 0 detect                    -- puts the inference stage in the chain\n"
-        << "  stats 0                           -- inference latency and last detections\n"
+        << "  stats 0                           -- per-stage latency and last detections\n"
         << "\n"
         << "Commands:\n"
         << "  create <src> <snk> <name>        Create a pipeline\n"
@@ -125,7 +125,7 @@ static std::string helpText()
         << "  detect-params <id> <conf> <nms> [draw]\n"
         << "                                   Detector thresholds (0..1) and box overlay (0/1)\n"
         << "  accel <id> <auto|cpu|vulkan|cuda>  Select accel backend (applied at next start)\n"
-        << "  stats <id>                       Inference latency and last detections\n"
+        << "  stats <id>                       Per-stage latency and last detections\n"
         << "  start <id>                       Start streaming (app sink -> prints socket path)\n"
         << "  stop <id>                        Stop streaming\n"
         << "  delete <id>                      Delete pipeline\n"
@@ -348,30 +348,61 @@ static std::string handleCommand(const std::string& line)
         if (!(iss >> id))
             out << "ERR INVALID_ARGS stats <id>\n";
         else {
-            InferenceStats st;
-            errorState err = mediaLib_getInferenceStats(id, st);
+            std::vector<InferenceStats> stages;
+            errorState err = mediaLib_getInferenceStats(id, stages);
             if (err == errorState::NOT_IMPLEMENTED_YET_ERR) {
-                // No inference stage in this pipeline — a normal state, not a
+                // No reporting stage in this pipeline — a normal state, not a
                 // failure: report it in the same shape so clients parse one form.
                 out << "OK model= loaded=0 infer_ms=0 avg_ms=0 inferred=0 skipped=0"
                        " objects=0 avg_conf=0\n";
             } else if (err != errorState::NO_ERR) {
                 out << "ERR " << errStr(err) << "\n";
             } else {
-                out << "OK model=" << st.modelName
-                    << " loaded="   << (st.modelLoaded ? 1 : 0)
-                    << " infer_ms=" << st.inferenceMs
-                    << " avg_ms="   << st.avgInferenceMs
-                    << " inferred=" << st.framesInferred
-                    << " skipped="  << st.framesSkipped
-                    << " objects="  << st.objectCount
-                    << " avg_conf=" << st.avgConfidence << "\n";
-                for (const auto& d : st.detections)
+                // First block: byte for byte what this verb has always replied,
+                // because a client written against it reads these lines and
+                // ignores everything after.
+                const InferenceStats& first = stages.front();
+                out << "OK model=" << first.modelName
+                    << " loaded="   << (first.modelLoaded ? 1 : 0)
+                    << " infer_ms=" << first.inferenceMs
+                    << " avg_ms="   << first.avgInferenceMs
+                    << " inferred=" << first.framesInferred
+                    << " skipped="  << first.framesSkipped
+                    << " objects="  << first.objectCount
+                    << " avg_conf=" << first.avgConfidence << "\n";
+                for (const auto& d : first.detections)
                     out << "det conf=" << d.confidence
                         << " box="     << d.x << "," << d.y << "," << d.width << "," << d.height
                         << " label="   << d.label << "\n";   // label last: it may contain spaces
-                if (!st.lastError.empty())
-                    out << "error=" << st.lastError << "\n";
+                if (!first.lastError.empty())
+                    out << "error=" << first.lastError << "\n";
+
+                // Then every stage in one uniform shape, the first one included.
+                // Repeating it is deliberate: a client reading only `stage` lines
+                // gets the whole chain from one format, instead of having to
+                // merge the block above with the ones below to see every stage.
+                // The prefixes are chosen so a client written against the old
+                // reply skips these lines rather than mistaking them for `det`.
+                for (const auto& st : stages) {
+                    out << "stage name=" << st.stage
+                        << " model="     << st.modelName
+                        << " loaded="    << (st.modelLoaded ? 1 : 0)
+                        << " infer_ms="  << st.inferenceMs
+                        << " avg_ms="    << st.avgInferenceMs
+                        << " inferred="  << st.framesInferred
+                        << " skipped="   << st.framesSkipped
+                        << " objects="   << st.objectCount
+                        << " avg_conf="  << st.avgConfidence << "\n";
+                    // A stage-det belongs to the `stage` line above it, the same
+                    // positional rule `det` already follows.
+                    for (const auto& d : st.detections)
+                        out << "stage-det conf=" << d.confidence
+                            << " box="   << d.x << "," << d.y << "," << d.width << "," << d.height
+                            << " label=" << d.label << "\n";
+                    if (!st.lastError.empty())
+                        out << "stage-error name=" << st.stage
+                            << " error=" << st.lastError << "\n";
+                }
             }
         }
     }

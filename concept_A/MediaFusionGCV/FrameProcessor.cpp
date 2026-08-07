@@ -51,7 +51,7 @@ bool FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
         params = m_algoParams;
     }
 
-    std::vector<std::unique_ptr<Algorithm>> built;
+    std::vector<std::shared_ptr<Algorithm>> built;
     built.reserve(names.size());
     for (const auto& n : names) {
         auto a = makeAlgorithm(n);
@@ -72,6 +72,12 @@ bool FrameProcessor::setAlgorithms(const std::vector<std::string>& names)
 
     std::lock_guard<std::mutex> lk(m_mutex);
     m_algos = std::move(built);
+    {
+        // Publish the same stages for the telemetry poll to read without ever
+        // touching m_mutex. Done inside this scope so the two cannot diverge.
+        std::lock_guard<std::mutex> sk(m_statsMutex);
+        m_statsStages = m_algos;
+    }
     return true;
 }
 
@@ -152,13 +158,28 @@ DetectorConfig FrameProcessor::detectorConfig() const
     return m_detectorConfig;
 }
 
-bool FrameProcessor::inferenceStats(InferenceStats& out) const
+std::vector<InferenceStats> FrameProcessor::stageStats() const
 {
-    std::lock_guard<std::mutex> lk(m_mutex);
-    for (const auto& a : m_algos)
-        if (a->snapshotStats(out))
-            return true;
-    return false;
+    // Copy the pointers, then let the lock go before asking any stage anything.
+    // Holding m_statsMutex across snapshotStats() would be harmless today, but
+    // the point of this path is that a poll never waits on the frame path, and
+    // the shorter the window the easier that stays true.
+    std::vector<std::shared_ptr<Algorithm>> stages;
+    {
+        std::lock_guard<std::mutex> lk(m_statsMutex);
+        stages = m_statsStages;
+    }
+
+    std::vector<InferenceStats> out;
+    for (const auto& a : stages) {
+        InferenceStats st;
+        // snapshotStats() clears its output first, so the name goes on after.
+        if (a->snapshotStats(st)) {
+            st.stage = a->name();
+            out.push_back(std::move(st));
+        }
+    }
+    return out;
 }
 
 std::vector<std::string> FrameProcessor::activeAlgorithms() const

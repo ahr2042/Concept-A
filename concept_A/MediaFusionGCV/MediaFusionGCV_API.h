@@ -105,9 +105,13 @@ extern "C" {
 	// Empty when no weights are installed. Pointer valid until the next call.
 	MEDIAFUSIONGCV_API const char* mediaLib_availableModels();
 
-	// Last completed inference for this pipeline. NULLPTR_ERR for a bad id,
-	// NOT_IMPLEMENTED_YET_ERR when the chain has no inference stage.
-	MEDIAFUSIONGCV_API errorState  mediaLib_getInferenceStats(size_t, InferenceStats&);
+	// What each reporting stage in this pipeline last produced, in chain order.
+	// A list rather than one struct because a chain may hold more than one stage
+	// that reports (an object detector and a motion stage), and each block names
+	// its own stage. NULLPTR_ERR for a bad id, NOT_IMPLEMENTED_YET_ERR when no
+	// stage in the chain reports — a normal state, not a failure.
+	MEDIAFUSIONGCV_API errorState  mediaLib_getInferenceStats(size_t,
+	                                                          std::vector<InferenceStats>&);
 
 	// Acceleration backends detected on this host (probed once at init). One line
 	// per backend: "backend=<cpu|vulkan|cuda> available=<0|1> device=<name>".

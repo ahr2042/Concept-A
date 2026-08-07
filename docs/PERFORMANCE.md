@@ -114,6 +114,31 @@ motion analysis more expensive, only the resize and the blend. And `overlay` mod
 costs ~1.6 ms more than `mask` at 1080p — a full-frame `clone` + `addWeighted`
 that a later pass could narrow to the mask's bounding box.
 
+### Cost of the telemetry poll (P15)
+
+`stats <id>` round trip over the control socket, 300 polls at ~15 ms while
+streaming 1920×1080, measured 2026-08-07. The console polls this once a second.
+
+| Chain | | mean | median | p95 | max | over 1 ms |
+|---|---|---|---|---|---|---|
+| `motion` | before | 0.272 ms | 0.112 ms | 1.337 ms | **4.702 ms** | 22 / 300 |
+| `motion` | after | 0.111 ms | 0.112 ms | 0.141 ms | **0.550 ms** | 0 / 300 |
+| `motion,detect` | before | 0.262 ms | 0.113 ms | 1.779 ms | **3.522 ms** | 18 / 300 |
+| `motion,detect` | after | 0.113 ms | 0.113 ms | 0.146 ms | **0.192 ms** | 0 / 300 |
+
+**Read the median and the max together — that is the whole story.** The median
+never moved: a poll that lands between frames was always fast. What was wrong is
+that ~7% of polls landed *inside* a frame's processing window and paid the entire
+chain for it, which is why the worst case sat at 4.7 ms — `motion`'s own
+per-frame cost, measured independently above as 4.4 ms. That is not a coincidence;
+it is the mutex.
+
+After the fix the tail is gone outright: not one poll in 600 crossed a
+millisecond. This never cost throughput, which is why it sat in the backlog at
+"low" — but a latency chart whose own sample instants are delayed by the pipeline
+is a chart that misreports the thing it exists to measure, and every stage added
+to the motion family would have made it worse.
+
 ## Landed
 
 | # | Item | Where |
@@ -122,6 +147,7 @@ that a later pass could narrow to the mask's bounding box.
 | P2 | `videoconvert n-threads=0`. It defaults to **1**, so the per-camera colourspace convert was single-threaded on both sides | `PipelineManager.cpp` ctor, `StreamReceiver.cpp` |
 | P3 | Cap OpenCV's thread pool at ¼ of the cores (`MEDIAFUSION_CV_THREADS` overrides; `0` disables the cap). Left alone OpenCV takes every core for each `forward()`, so N cameras meant N×cores runnable threads evicting the capture threads | `MediaFusionGCV_API.cpp` |
 | P4 | `queue max-size-buffers=3 leaky=downstream` directly after the source. The only queue used to be at the *end* of the chain, so capture, convert and every OpenCV stage ran in one thread and any hiccup stalled buffer dequeue — driver-level frame drops | `GStreamerSource.h`, `PipelineManager.cpp` |
+| P15 | **Stats poll off the frame mutex.** `inferenceStats()` took `m_mutex`, which the streaming thread holds for the *whole* algorithm chain, so the telemetry poll waited out a frame's OpenCV work. `FrameProcessor` now publishes the chain a second time behind its own lock (`m_statsStages`, shared_ptr so the poll can let go of the lock before asking a stage anything) and the poll never touches `m_mutex`. Measured below | `FrameProcessor.{h,cpp}` |
 | P5 | **MJPEG capture.** Enumeration filtered everything except `video/x-raw`, so only uncompressed modes were selectable; a decoder (`jpegdec`, else `avdec_mjpeg`) is now spliced in when an encoded mode is chosen. 720p YUYV is ~55 MB/s (~440 Mbit/s) — two cameras cannot both fit on one USB 2.0 bus (480 Mbit/s shared) and the UVC driver starves the second one | `GStreamerSourceCamera.cpp`, `PipelineManager.cpp`, `DeviceParser.cpp` |
 
 ## Backlog
@@ -140,7 +166,6 @@ S (a sitting), M (a session), L (multi-session or needs a design decision).
 | P12 | Share one detector/model across pipelines | high | L | open |
 | P13 | Carry YUYV/NV12 over the IPC socket, convert once at the sink | high | L | open |
 | P14 | Share one GL context/display across tiles | med | L | open |
-| P15 | Narrow `FrameProcessor::m_mutex` so `stats` does not block on a frame | low | S | open |
 | P16 | Keep watching the bus after the first message | low | S | open |
 | P17 | Revisit `sync=false` on both sinks — nothing paces or sheds on the clock | med | M | open |
 | P18 | VA-API hardware JPEG decode (`vajpegdec`) | med | M | open |
@@ -152,8 +177,8 @@ S (a sitting), M (a session), L (multi-session or needs a design decision).
 
 **The motion stages downscale for analysis.** `framediff` is single-channel and
 cheap. Its successors are not — the measurement above puts full-frame MOG2 at
-10.6 ms at 1080p, and dense optical flow will be far worse — and the whole chain
-runs on the streaming thread holding `FrameProcessor::m_mutex` (see P15). So
+10.7 ms at 1080p, and dense optical flow will be far worse — and the whole chain
+runs on the streaming thread, so a stage's cost is the stream's cost. So
 `motion` runs its subtractor on a 360-row copy and scales the mask back up to
 draw, which more than halves it; a motion mask does not need 1080p. **Every later
 stage in the family should do the same**, and M3's boxes should be found at
@@ -219,11 +244,6 @@ Interacts with P6 and with the in-place pad-probe contract below.
 `glimagesink`, so a 2×2 grid is four GL contexts, four context threads and four
 texture pools. `gstglcontext` sharing via a `GstGLDisplay` on the pipeline bus is
 the supported route.
-
-**P15 — processor mutex.** `FrameProcessor::m_mutex` is held for the entire
-algorithm chain on every frame, and `inferenceStats()` takes the same mutex, so
-the 1 Hz stats poll blocks behind a frame's worth of OpenCV work. Jitter, not
-throughput — but it makes the telemetry lie about its own sample time.
 
 **P16 — bus loop.** `PipelineManager::startLoop` `break`s out of the poll loop
 after the *first* message, so one mid-stream error is logged and then nothing is

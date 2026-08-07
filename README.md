@@ -162,7 +162,7 @@ interactively: run the engine without arguments for a REPL, or
 | `models` | model listing | Detector models installed in `models/` |
 | `model <id> [name]` | `OK <name>` | Load a detector model (no name unloads it) |
 | `detect-params <id> <conf> <nms> [draw]` | `OK` | Detector thresholds and box overlay |
-| `stats <id>` | stats + detections | Inference latency and the last result |
+| `stats <id>` | stats + detections | Per-stage latency and the last result. The first block is the legacy detector shape; a `stage`/`stage-det` block then repeats it and follows with every other reporting stage |
 | `start <id>` | `OK <video-socket-path>` | Start streaming; reply carries the data-plane socket |
 | `stop <id>` | `OK` | Stop streaming |
 | `delete <id>` | `OK remaining=N` | Destroy a pipeline (**ids shift down** — clients re-map) |
