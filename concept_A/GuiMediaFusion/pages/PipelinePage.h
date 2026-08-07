@@ -17,11 +17,12 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 class QRadioButton;
+class QSlider;
 class QStackedWidget;
 
 class NodeCanvas;
 
-namespace vos { class ParamPanel; }
+namespace vos { class ParamPanel; class ToggleSwitch; }
 
 class PipelinePage : public QWidget
 {
@@ -36,6 +37,8 @@ private slots:
     void onDeploy();
     void publishChain();
     void showSource(const BackendService::DeploySpec& cfg);
+    void refreshAccelToggle();
+    void onDetectorSettingChanged();
     void onHalt();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
     void onSessionStopped(int sessionId);
@@ -57,6 +60,13 @@ private:
     QComboBox*      m_modelBox    = nullptr;
     // The processing chain, in the one widget that owns it console-wide.
     vos::ChainEditor* m_chain = nullptr;
+
+    // Detector thresholds and the pipeline-level acceleration choice, both moved
+    // here from the Dashboard: they configure a deploy rather than watch one.
+    QSlider*           m_confSlider  = nullptr;
+    QLabel*            m_confLabel   = nullptr;
+    QLabel*            m_accelHw     = nullptr;
+    vos::ToggleSwitch* m_accelToggle = nullptr;
     QRadioButton*   m_sinkApp    = nullptr;
     QRadioButton*   m_sinkScreen = nullptr;
     QPushButton*    m_deployBtn  = nullptr;

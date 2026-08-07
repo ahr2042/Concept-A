@@ -255,7 +255,30 @@ QWidget* PipelinePage::buildPropertiesPanel()
     m_modelBox->setToolTip(QStringLiteral(
         "The model the DETECT algorithm runs. Tick DETECT above to put the\n"
         "inference stage in this node's chain."));
+    connect(m_modelBox, &QComboBox::currentIndexChanged, this,
+            &PipelinePage::onDetectorSettingChanged);
     procLay->addWidget(m_modelBox);
+
+    // The detector's threshold sits with the detector, next to the model it
+    // applies to, rather than on the page that watches the stream run.
+    auto* confRow = new QHBoxLayout;
+    confRow->addWidget(vos::capsLabel(QStringLiteral("CONFIDENCE"), 8, proc));
+    confRow->addStretch(1);
+    m_confLabel = vos::dataLabel(QStringLiteral("0.25"), 10, proc);
+    confRow->addWidget(m_confLabel);
+    procLay->addLayout(confRow);
+
+    m_confSlider = new QSlider(Qt::Horizontal, proc);
+    m_confSlider->setRange(5, 95);            // 0.05 … 0.95
+    m_confSlider->setValue(25);
+    connect(m_confSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_confLabel->setText(QString::number(v / 100.0, 'f', 2));
+    });
+    // Commit on release only: dragging would fire a control command per pixel.
+    connect(m_confSlider, &QSlider::sliderReleased, this,
+            &PipelinePage::onDetectorSettingChanged);
+    procLay->addWidget(m_confSlider);
+
     auto* aiHint = new QLabel(QStringLiteral(
         "Inference runs on a worker thread; the pad probe overlays the newest "
         "result, so detection cost does not throttle the stream."), proc);
@@ -294,6 +317,33 @@ QWidget* PipelinePage::buildPropertiesPanel()
     m_propsStack->addWidget(out);
 
     outer->addWidget(m_propsStack, 1);
+
+    // Pipeline-level, not node-level: acceleration applies to the whole deploy,
+    // so it belongs beside DEPLOY rather than inside any one node's properties.
+    auto* accelCard = vos::makeCard("raised", panel);
+    auto* accelLay = new QHBoxLayout(accelCard);
+    accelLay->setContentsMargins(10, 8, 10, 8);
+    auto* accelText = new QVBoxLayout;
+    accelText->setSpacing(2);
+    accelText->addWidget(vos::dataLabel(QStringLiteral("GPU_ACCELERATION"), 10, accelCard));
+    m_accelHw = vos::capsLabel(QStringLiteral("DETECTING…"), 8, accelCard);
+    accelText->addWidget(m_accelHw);
+    accelLay->addLayout(accelText);
+    accelLay->addStretch(1);
+    m_accelToggle = new vos::ToggleSwitch(accelCard);
+    connect(m_accelToggle, &vos::ToggleSwitch::toggled, this, [this](bool on) {
+        // ON = let the detector use the GPU (AUTO resolves to Vulkan); OFF = CPU.
+        m_service->setAccelSelection(on ? QStringLiteral("auto") : QStringLiteral("cpu"));
+    });
+    connect(m_service, &BackendService::acceleratorsChanged, this,
+            [this](const QVector<AcceleratorOption>&) { refreshAccelToggle(); });
+    connect(m_service, &BackendService::accelSelectionChanged, this,
+            [this](const QString&) { refreshAccelToggle(); },
+            Qt::QueuedConnection);   // sync with the Settings radios
+    accelLay->addWidget(m_accelToggle);
+    refreshAccelToggle();
+    m_service->refreshAccelerators();
+    outer->addWidget(accelCard);
 
     m_deployBtn = new QPushButton(QStringLiteral("DEPLOY PIPELINE"), panel);
     m_deployBtn->setProperty("vosRole", QStringLiteral("deploy"));
@@ -384,6 +434,41 @@ void PipelinePage::publishChain()
         m_service->setDetectorSettings(m_modelBox->currentData().toString(),
                                        m_service->config().confidence,
                                        m_service->config().nms, true);
+}
+
+// Capability-driven: the toggle offers the GPU only when one was detected, and
+// names the device that was found so the operator knows what "on" means.
+void PipelinePage::refreshAccelToggle()
+{
+    if (!m_accelToggle)
+        return;
+    QString device;
+    for (const AcceleratorOption& o : m_service->accelerators())
+        if (o.available && o.backend != QLatin1String("cpu")) {
+            device = o.device;
+            break;
+        }
+    const bool gpu = !device.isEmpty();
+
+    m_accelHw->setText(gpu ? device.toUpper() : QStringLiteral("CPU ONLY — NO GPU DETECTED"));
+    m_accelToggle->setEnabled(gpu);
+    m_accelToggle->setChecked(gpu && m_service->accelSelection() != QLatin1String("cpu"));
+    m_accelToggle->setToolTip(gpu
+        ? QStringLiteral("Run the detector on the GPU (ncnn + Vulkan). Applied on the next deploy.")
+        : QStringLiteral("No GPU detected — CPU only."));
+}
+
+// Model or threshold moved. Both live in the working config; a live session also
+// gets them straight away, since the detector reloads off the streaming thread.
+void PipelinePage::onDetectorSettingChanged()
+{
+    if (!m_modelBox->isEnabled())
+        return;
+    const QString model = m_modelBox->currentData().toString();
+    const double  conf  = m_confSlider->value() / 100.0;
+    m_service->setDetectorSettings(model, conf, m_service->config().nms, true);
+    if (m_sessionId >= 0)
+        m_service->setDetector(m_sessionId, model, conf, m_service->config().nms, true);
 }
 
 void PipelinePage::onDeploy()
