@@ -170,6 +170,7 @@ PipelinePage::PipelinePage(BackendService* service, QWidget* parent)
     connect(m_canvas, &NodeCanvas::nodeSelected, this, &PipelinePage::showNodeProps);
     connect(m_service, &BackendService::devicesChanged,    this, &PipelinePage::onDevices);
     connect(m_service, &BackendService::algorithmsChanged, this, &PipelinePage::onAlgorithms);
+    connect(m_service, &BackendService::configChanged, this, &PipelinePage::showSource);
     connect(m_service, &BackendService::modelsChanged,     this, &PipelinePage::onModels);
     connect(m_service, &BackendService::sessionStarted,    this, &PipelinePage::onSessionStarted);
     connect(m_service, &BackendService::sessionStopped,    this, &PipelinePage::onSessionStopped);
@@ -198,33 +199,24 @@ QWidget* PipelinePage::buildPropertiesPanel()
     srcTitle->setStyleSheet(QStringLiteral("color:%1;").arg(theme::palette().accent.name()));
     srcLay->addWidget(srcTitle);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("ID: NODE_SRC_0001"), 8, src));
+
+    // The selection itself lives in the rail, where it is visible from every
+    // page. What belongs to the node is what it resolved to: the device, the
+    // mode, and the caps the pipeline will actually negotiate.
     srcLay->addWidget(vos::capsLabel(QStringLiteral("DEVICE"), 8, src));
-    m_deviceBox = new QComboBox(src);
-    srcLay->addWidget(m_deviceBox);
+    m_deviceLabel = vos::dataLabel(QStringLiteral("—"), 10, src);
+    m_deviceLabel->setWordWrap(true);
+    srcLay->addWidget(m_deviceLabel);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("CAPTURE MODE"), 8, src));
-    m_capsBox = new QComboBox(src);
-    srcLay->addWidget(m_capsBox);
+    m_capsLabel = vos::dataLabel(QStringLiteral("—"), 10, src);
+    m_capsLabel->setWordWrap(true);
+    srcLay->addWidget(m_capsLabel);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("RAW CAPS"), 8, src));
     auto* rawView = new QTextEdit(src);
     rawView->setReadOnly(true);
     rawView->setFixedHeight(120);
     srcLay->addWidget(rawView);
     rawView->setObjectName(QStringLiteral("rawCaps"));
-    connect(m_deviceBox, &QComboBox::currentIndexChanged, this, [this](int idx) {
-        m_capsBox->clear();
-        if (idx >= 0 && idx < m_devices.size()) {
-            for (const CapInfo& c : m_devices[idx].caps)
-                m_capsBox->addItem(c.label, c.index);
-            m_canvas->setNodeTitle(0, m_devices[idx].name.toUpper().left(20));
-        }
-    });
-    connect(m_capsBox, &QComboBox::currentIndexChanged, this, [this](int cidx) {
-        auto* view = findChild<QTextEdit*>(QStringLiteral("rawCaps"));
-        const int didx = m_deviceBox->currentIndex();
-        if (view && didx >= 0 && didx < m_devices.size()
-            && cidx >= 0 && cidx < m_devices[didx].caps.size())
-            view->setPlainText(m_devices[didx].caps[cidx].raw);
-    });
     srcLay->addStretch(1);
     m_propsStack->addWidget(src);
 
@@ -239,12 +231,21 @@ QWidget* PipelinePage::buildPropertiesPanel()
     procLay->addWidget(procTitle);
     procLay->addWidget(vos::capsLabel(QStringLiteral("ID: NODE_PROC_0002 — IN-PLACE PAD PROBE"), 8, proc));
     procLay->addWidget(vos::capsLabel(QStringLiteral("REAL-TIME ALGORITHMS"), 8, proc));
-    auto* algoHost = new QWidget(proc);
-    algoHost->setObjectName(QStringLiteral("pipeAlgoHost"));
-    auto* algoLay = new QVBoxLayout(algoHost);
-    algoLay->setContentsMargins(0, 0, 0, 0);
-    algoLay->setSpacing(6);
-    procLay->addWidget(algoHost);
+    m_chain = new vos::ChainEditor(m_service, proc);
+    procLay->addWidget(m_chain);
+    connect(m_chain, &vos::ChainEditor::chainChanged, this,
+            [this](const QString&, const AlgorithmSettings&) { publishChain(); });
+    // A knob committed on a running session takes effect within a frame or two;
+    // without one the value simply waits in the config for the next deploy.
+    //
+    // primarySession(), not this page's own id: the chain is edited here but the
+    // stream is just as often started from the Dashboard, and keying off the
+    // local id would silently stop retuning in exactly that case.
+    connect(m_chain, &vos::ChainEditor::stageRetuned, this,
+            [this](const QString& algo, const QVariantMap& values) {
+        if (m_service->primarySession() >= 0)
+            m_service->setAlgorithmParams(m_service->primarySession(), algo, values);
+    });
 
     procLay->addWidget(vos::makeHSeparator(proc));
     auto* aiRow = new QHBoxLayout;
@@ -258,7 +259,30 @@ QWidget* PipelinePage::buildPropertiesPanel()
     m_modelBox->setToolTip(QStringLiteral(
         "The model the DETECT algorithm runs. Tick DETECT above to put the\n"
         "inference stage in this node's chain."));
+    connect(m_modelBox, &QComboBox::currentIndexChanged, this,
+            &PipelinePage::onDetectorSettingChanged);
     procLay->addWidget(m_modelBox);
+
+    // The detector's threshold sits with the detector, next to the model it
+    // applies to, rather than on the page that watches the stream run.
+    auto* confRow = new QHBoxLayout;
+    confRow->addWidget(vos::capsLabel(QStringLiteral("CONFIDENCE"), 8, proc));
+    confRow->addStretch(1);
+    m_confLabel = vos::dataLabel(QStringLiteral("0.25"), 10, proc);
+    confRow->addWidget(m_confLabel);
+    procLay->addLayout(confRow);
+
+    m_confSlider = new QSlider(Qt::Horizontal, proc);
+    m_confSlider->setRange(5, 95);            // 0.05 … 0.95
+    m_confSlider->setValue(25);
+    connect(m_confSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_confLabel->setText(QString::number(v / 100.0, 'f', 2));
+    });
+    // Commit on release only: dragging would fire a control command per pixel.
+    connect(m_confSlider, &QSlider::sliderReleased, this,
+            &PipelinePage::onDetectorSettingChanged);
+    procLay->addWidget(m_confSlider);
+
     auto* aiHint = new QLabel(QStringLiteral(
         "Inference runs on a worker thread; the pad probe overlays the newest "
         "result, so detection cost does not throttle the stream."), proc);
@@ -298,6 +322,33 @@ QWidget* PipelinePage::buildPropertiesPanel()
 
     outer->addWidget(m_propsStack, 1);
 
+    // Pipeline-level, not node-level: acceleration applies to the whole deploy,
+    // so it belongs beside DEPLOY rather than inside any one node's properties.
+    auto* accelCard = vos::makeCard("raised", panel);
+    auto* accelLay = new QHBoxLayout(accelCard);
+    accelLay->setContentsMargins(10, 8, 10, 8);
+    auto* accelText = new QVBoxLayout;
+    accelText->setSpacing(2);
+    accelText->addWidget(vos::dataLabel(QStringLiteral("GPU_ACCELERATION"), 10, accelCard));
+    m_accelHw = vos::capsLabel(QStringLiteral("DETECTING…"), 8, accelCard);
+    accelText->addWidget(m_accelHw);
+    accelLay->addLayout(accelText);
+    accelLay->addStretch(1);
+    m_accelToggle = new vos::ToggleSwitch(accelCard);
+    connect(m_accelToggle, &vos::ToggleSwitch::toggled, this, [this](bool on) {
+        // ON = let the detector use the GPU (AUTO resolves to Vulkan); OFF = CPU.
+        m_service->setAccelSelection(on ? QStringLiteral("auto") : QStringLiteral("cpu"));
+    });
+    connect(m_service, &BackendService::acceleratorsChanged, this,
+            [this](const QVector<AcceleratorOption>&) { refreshAccelToggle(); });
+    connect(m_service, &BackendService::accelSelectionChanged, this,
+            [this](const QString&) { refreshAccelToggle(); },
+            Qt::QueuedConnection);   // sync with the Settings radios
+    accelLay->addWidget(m_accelToggle);
+    refreshAccelToggle();
+    m_service->refreshAccelerators();
+    outer->addWidget(accelCard);
+
     m_deployBtn = new QPushButton(QStringLiteral("DEPLOY PIPELINE"), panel);
     m_deployBtn->setProperty("vosRole", QStringLiteral("deploy"));
     m_deployBtn->setFixedHeight(40);
@@ -320,10 +371,30 @@ void PipelinePage::showNodeProps(int node)
 void PipelinePage::onDevices(const QVector<DeviceInfo>& devices)
 {
     m_devices = devices;
-    m_deviceBox->clear();
-    for (const DeviceInfo& d : devices)
-        m_deviceBox->addItem(d.name.toUpper(), d.index);
     m_deployBtn->setEnabled(!devices.isEmpty() && m_sessionId < 0);
+    showSource(m_service->config());
+}
+
+// Reflect whatever source the rail has selected into the SOURCE node.
+void PipelinePage::showSource(const BackendService::DeploySpec& cfg)
+{
+    const DeviceInfo* device = nullptr;
+    for (const DeviceInfo& d : m_devices)
+        if (d.index == cfg.deviceIndex)
+            device = &d;
+
+    const CapInfo* cap = nullptr;
+    if (device)
+        for (const CapInfo& c : device->caps)
+            if (c.index == cfg.capIndex)
+                cap = &c;
+
+    m_deviceLabel->setText(device ? device->name.toUpper() : QStringLiteral("—"));
+    m_capsLabel->setText(cap ? cap->label : QStringLiteral("—"));
+    if (auto* view = findChild<QTextEdit*>(QStringLiteral("rawCaps")))
+        view->setPlainText(cap ? cap->raw : QString());
+    if (device)
+        m_canvas->setNodeTitle(0, device->name.toUpper().left(20));
 }
 
 void PipelinePage::onModels(const QVector<DetectorModel>& models)
@@ -345,70 +416,76 @@ void PipelinePage::onModels(const QVector<DetectorModel>& models)
 
 void PipelinePage::onAlgorithms(const QStringList& algos)
 {
-    auto* host = findChild<QWidget*>(QStringLiteral("pipeAlgoHost"));
-    if (!host) return;
-    QLayoutItem* item;
-    while ((item = host->layout()->takeAt(0)) != nullptr) {
-        delete item->widget();
-        delete item;
-    }
-    m_algoBoxes.clear();
-    m_algoPanels.clear();
-    for (const QString& a : algos) {
-        auto* cb = new QCheckBox(a.toUpper(), host);
-        cb->setToolTip(m_service->algorithmSummary(a));
-        connect(cb, &QCheckBox::toggled, this, [this] {
-            QStringList active;
-            for (QCheckBox* b : m_algoBoxes)
-                if (b->isChecked()) active << b->text();
-            m_canvas->setNodeTitle(1, active.isEmpty() ? QStringLiteral("PASSTHROUGH")
-                                                       : active.join(QStringLiteral(" → ")));
-        });
-        m_algoBoxes.append(cb);
-        host->layout()->addWidget(cb);
+    if (m_chain)
+        m_chain->rebuild(algos);
+}
 
-        // Controls for this stage's knobs, revealed with the stage itself.
-        const QVector<AlgorithmParamSpec> schema = m_service->algorithmParams(a);
-        if (schema.isEmpty())
-            continue;
+// Mirror the chain editor into the shared working config, and keep the canvas
+// node reading as what the chain actually does.
+void PipelinePage::publishChain()
+{
+    if (!m_chain)
+        return;
+    const QString csv = m_chain->algosCsv();
+    m_service->setChain(csv, m_chain->algoParams());
 
-        auto* panel = new vos::ParamPanel(a, schema, host);
-        panel->setVisible(false);
-        connect(cb, &QCheckBox::toggled, panel, &QWidget::setVisible);
-        connect(panel, &vos::ParamPanel::changed, this,
-                [this](const QString& algo, const QVariantMap& values) {
-            if (m_sessionId >= 0)
-                m_service->setAlgorithmParams(m_sessionId, algo, values);
-        });
-        m_algoPanels.insert(a, panel);
-        host->layout()->addWidget(panel);
-    }
-    m_canvas->setNodeTitle(1, QStringLiteral("PASSTHROUGH"));
+    const QStringList active = csv.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    m_canvas->setNodeTitle(1, active.isEmpty()
+        ? QStringLiteral("PASSTHROUGH")
+        : active.join(QStringLiteral(" → ")).toUpper());
+
+    if (m_modelBox->isEnabled())
+        m_service->setDetectorSettings(m_modelBox->currentData().toString(),
+                                       m_service->config().confidence,
+                                       m_service->config().nms, true);
+}
+
+// Capability-driven: the toggle offers the GPU only when one was detected, and
+// names the device that was found so the operator knows what "on" means.
+void PipelinePage::refreshAccelToggle()
+{
+    if (!m_accelToggle)
+        return;
+    QString device;
+    for (const AcceleratorOption& o : m_service->accelerators())
+        if (o.available && o.backend != QLatin1String("cpu")) {
+            device = o.device;
+            break;
+        }
+    const bool gpu = !device.isEmpty();
+
+    m_accelHw->setText(gpu ? device.toUpper() : QStringLiteral("CPU ONLY — NO GPU DETECTED"));
+    m_accelToggle->setEnabled(gpu);
+    m_accelToggle->setChecked(gpu && m_service->accelSelection() != QLatin1String("cpu"));
+    m_accelToggle->setToolTip(gpu
+        ? QStringLiteral("Run the detector on the GPU (ncnn + Vulkan). Applied on the next deploy.")
+        : QStringLiteral("No GPU detected — CPU only."));
+}
+
+// Model or threshold moved. Both live in the working config; a live session also
+// gets them straight away, since the detector reloads off the streaming thread.
+void PipelinePage::onDetectorSettingChanged()
+{
+    if (!m_modelBox->isEnabled())
+        return;
+    const QString model = m_modelBox->currentData().toString();
+    const double  conf  = m_confSlider->value() / 100.0;
+    m_service->setDetectorSettings(model, conf, m_service->config().nms, true);
+    // Same reasoning as the chain knobs: whichever page started the stream.
+    if (m_service->primarySession() >= 0)
+        m_service->setDetector(m_service->primarySession(), model, conf,
+                               m_service->config().nms, true);
 }
 
 void PipelinePage::onDeploy()
 {
-    if (!m_deviceBox->currentData().isValid())
+    if (m_devices.isEmpty())
         return;
-    BackendService::DeploySpec spec;
-    spec.deviceIndex = m_deviceBox->currentData().toInt();
-    spec.capIndex    = m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0;
-    QStringList active;
-    for (QCheckBox* b : m_algoBoxes) {
-        if (!b->isChecked())
-            continue;
-        const QString algo = b->text().toLower();
-        active << algo;
-        if (auto* panel = m_algoPanels.value(algo, nullptr))
-            spec.algoParams.insert(algo, panel->values());
-    }
-    spec.algosCsv   = active.join(',');
-    spec.screenSink = m_sinkScreen->isChecked();
-    spec.name       = QStringLiteral("pipeline-editor");
-    if (m_modelBox->isEnabled())
-        spec.detectorModel = m_modelBox->currentData().toString();
-    spec.accelSelection = m_service->accelSelection();
-    m_sessionId = m_service->deploy(spec);
+    // Deploy the working config rather than this page's widgets. It used to
+    // build its own spec here, which is why it never sent the confidence.
+    publishChain();
+    m_sessionId = m_service->deployWorkingConfig(QStringLiteral("pipeline-editor"),
+                                                 m_sinkScreen->isChecked());
     m_deployBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("DEPLOYING…"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kWarn));
@@ -439,7 +516,7 @@ void PipelinePage::onSessionStopped(int sessionId)
     if (sessionId != m_sessionId) return;
     m_sessionId = -1;
     m_canvas->setNodeLive(false);
-    m_deployBtn->setEnabled(m_deviceBox->count() > 0);
+    m_deployBtn->setEnabled(!m_devices.isEmpty());
     m_haltBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("IDLE"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kOnSurfaceVariant));
@@ -451,7 +528,7 @@ void PipelinePage::onSessionFailed(int sessionId, const QString& error)
     Q_UNUSED(error);
     m_sessionId = -1;
     m_canvas->setNodeLive(false);
-    m_deployBtn->setEnabled(m_deviceBox->count() > 0);
+    m_deployBtn->setEnabled(!m_devices.isEmpty());
     m_haltBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("FAILED"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kError));

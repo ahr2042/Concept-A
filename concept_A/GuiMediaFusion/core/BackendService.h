@@ -125,6 +125,42 @@ public:
     explicit BackendService(QObject* parent = nullptr);
     ~BackendService() override;
 
+    // ── The working configuration ─────────────────────────────────────────
+    //
+    // The pipeline the operator is currently assembling. This used to live in
+    // each page's widget tree, which is why the same controls existed on two
+    // pages at once — and why the two deploy paths could quietly disagree: the
+    // Dashboard never sent the acceleration choice and the Pipeline page never
+    // sent the confidence.
+    //
+    // One document now, with each surface editing its own slice: the SideRail
+    // owns the source, the Pipeline page owns the chain and the inference
+    // settings, and the Dashboard only reads it (to summarise the chain, and to
+    // START what Pipeline configured). `name` and `screenSink` are not part of
+    // it — they belong to an individual deploy, and MultiGrid still builds its
+    // own spec per tile because each tile is its own pipeline.
+    const DeploySpec& config() const { return m_config; }
+
+    void setSource(int deviceIndex, int capIndex);
+    void setChain(const QString& algosCsv, const AlgorithmSettings& params);
+    void setDetectorSettings(const QString& model, double confidence,
+                             double nms, bool drawBoxes);
+
+    // Deploy the working config, and remember the session it produced as the
+    // primary one. Both surfaces use this: the Dashboard's START and the
+    // Pipeline page's DEPLOY are the same act on the same configuration.
+    int deployWorkingConfig(const QString& name, bool screenSink = false);
+
+    // The session the working config is currently running as, or -1.
+    //
+    // It has to live here rather than in a page. The chain is edited on the
+    // Pipeline page but the stream is often started from the Dashboard, and a
+    // page that only knew about sessions it launched itself would silently stop
+    // retuning a live stream that the other page had started. MultiGrid's
+    // per-tile sessions are deliberately not this — they are their own
+    // pipelines and keep their own ids.
+    int primarySession() const { return m_primarySession; }
+
     // configuration (persisted by SettingsPage via QSettings)
     QString controlSocketPath() const { return m_socketPath; }
     QString backendBinary() const     { return m_binary; }
@@ -136,7 +172,12 @@ public:
     void    setAccelSelection(const QString& s) {
         if (m_accelSelection == s) return;
         m_accelSelection = s;
+        // Also the config's, so there is one source of truth for what the next
+        // deploy will ask for. Both signals fire: the Settings radios listen for
+        // the specific one, the pages for the general one.
+        m_config.accelSelection = s;
         emit accelSelectionChanged(s);             // keep the Settings radios + Dashboard toggle in sync
+        emit configChanged(m_config);
     }
 
     DaemonState state() const { return m_state; }
@@ -193,6 +234,9 @@ signals:
     void modelsChanged(const QVector<DetectorModel>& models);
     void acceleratorsChanged(const QVector<AcceleratorOption>& accelerators);
     void accelSelectionChanged(const QString& selection);
+    // The working config changed, whoever changed it. Surfaces that show part of
+    // it (the rail's combos, the Dashboard's chain summary) refresh from here.
+    void configChanged(const BackendService::DeploySpec& config);
     void detectorChanged(int sessionId, bool ok, const QString& detail);
     void inferenceStatsChanged(int sessionId, const InferenceSnapshot& snapshot);
 
@@ -227,5 +271,7 @@ private:
     QVector<DetectorModel> m_models;
     QVector<AcceleratorOption> m_accelerators;
     QString                m_accelSelection = QStringLiteral("auto");
+    DeploySpec             m_config;                // the working configuration
+    int                    m_primarySession = -1;   // ... and the session running it
     QHash<int, QString>    m_lastDetections;   // sessionId → last logged label set
 };

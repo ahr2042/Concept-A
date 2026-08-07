@@ -369,6 +369,7 @@ ParamPanel::ParamPanel(const QString& algo, const QVector<AlgorithmParamSpec>& s
             connect(box, &QCheckBox::toggled, this,
                     [this, key = p.key](bool on) { commit(key, on ? 1.0 : 0.0); });
             outer->addWidget(box);
+            m_controls.insert(p.key, { box, 0.0, 1.0 });
             continue;
         }
 
@@ -381,6 +382,7 @@ ParamPanel::ParamPanel(const QString& algo, const QVector<AlgorithmParamSpec>& s
             connect(combo, &QComboBox::currentIndexChanged, this,
                     [this, key = p.key](int index) { commit(key, index); });
             outer->addWidget(combo);
+            m_controls.insert(p.key, { combo, 0.0, 1.0 });
             continue;
         }
 
@@ -419,6 +421,7 @@ ParamPanel::ParamPanel(const QString& algo, const QVector<AlgorithmParamSpec>& s
                 commit(key, valueAt(slider->sliderPosition()));
         });
         outer->addWidget(slider);
+        m_controls.insert(p.key, { slider, p.min, step });
     }
 }
 
@@ -426,6 +429,33 @@ void ParamPanel::commit(const QString& key, double value)
 {
     m_values.insert(key, value);
     emit changed(m_algo, m_values);
+}
+
+void ParamPanel::setValues(const QVariantMap& values)
+{
+    for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
+        const Control c = m_controls.value(it.key());
+        if (!c.widget)
+            continue;                       // a key this schema does not declare
+        const double v = it.value().toDouble();
+
+        // Restoring state must not read as an operator edit, or every restored
+        // control would fire an algo-set for a value already in force. A
+        // checkbox and a combo commit straight from their change signal, so they
+        // are blocked. A slider is not: it commits on release, and its
+        // valueChanged only moves the readout — blocking it would restore the
+        // thumb and leave the number beside it stale.
+        if (auto* box = qobject_cast<QCheckBox*>(c.widget)) {
+            QSignalBlocker block(box);
+            box->setChecked(v != 0.0);
+        } else if (auto* combo = qobject_cast<QComboBox*>(c.widget)) {
+            QSignalBlocker block(combo);
+            combo->setCurrentIndex(static_cast<int>(v));
+        } else if (auto* slider = qobject_cast<QSlider*>(c.widget)) {
+            slider->setValue(qRound((v - c.min) / (c.step > 0.0 ? c.step : 1.0)));
+        }
+        m_values.insert(it.key(), v);
+    }
 }
 
 QLabel* capsLabel(const QString& text, int pt, QWidget* parent, qreal tracking)

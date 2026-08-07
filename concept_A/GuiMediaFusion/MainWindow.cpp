@@ -123,9 +123,26 @@ MainWindow::MainWindow()
     connect(m_service, &BackendService::daemonStateChanged, this,
             [this](BackendService::DaemonState st) { onDaemonState(int(st)); });
     connect(m_service, &BackendService::devicesChanged, this,
-            [this](const QVector<DeviceInfo>& devs) { m_rail->setUsbCount(devs.size()); });
+            [this](const QVector<DeviceInfo>& devs) {
+        m_rail->setUsbCount(devs.size());
+        m_rail->setDevices(devs);
+    });
+    // The rail owns the source; everything else reads it out of the working
+    // config rather than keeping a second copy of these two combo boxes.
+    connect(m_rail, &SideRail::sourceChanged, this, [this](int device, int cap) {
+        m_service->setSource(device, cap);
+    });
+    connect(m_service, &BackendService::configChanged, this,
+            [this](const BackendService::DeploySpec& cfg) {
+        m_rail->setSource(cfg.deviceIndex, cfg.capIndex);
+    });
 
     connect(m_dashboard, &DashboardPage::fpsSample, m_analytics, &AnalyticsPage::pushFps);
+    // The Dashboard shows the chain; the Pipeline page is where it is built.
+    connect(m_dashboard, &DashboardPage::configureRequested, this, [this] {
+        m_pages->setCurrentWidget(m_pipeline);
+        m_topBar->nav()->setCurrent(1);
+    });
     connect(m_settings, &SettingsPage::accentChanged, this, &MainWindow::applyTheme);
     connect(m_settings, &SettingsPage::verbosityChanged, this, [this](int lvl) {
         m_logs->setMinLevel(lvl);

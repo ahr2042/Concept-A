@@ -8,6 +8,7 @@
 // create → set-device → algos → start sequence; free node graphs stay PLANNED.
 
 #include "../core/BackendService.h"
+#include "../widgets/ChainEditor.h"
 
 #include <QWidget>
 
@@ -16,11 +17,12 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 class QRadioButton;
+class QSlider;
 class QStackedWidget;
 
 class NodeCanvas;
 
-namespace vos { class ParamPanel; }
+namespace vos { class ParamPanel; class ToggleSwitch; }
 
 class PipelinePage : public QWidget
 {
@@ -33,6 +35,10 @@ private slots:
     void onAlgorithms(const QStringList& algos);
     void onModels(const QVector<DetectorModel>& models);
     void onDeploy();
+    void publishChain();
+    void showSource(const BackendService::DeploySpec& cfg);
+    void refreshAccelToggle();
+    void onDetectorSettingChanged();
     void onHalt();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
     void onSessionStopped(int sessionId);
@@ -47,12 +53,20 @@ private:
     int             m_sessionId = -1;
 
     QStackedWidget* m_propsStack = nullptr;
-    QComboBox*      m_deviceBox  = nullptr;
-    QComboBox*      m_capsBox    = nullptr;
-    QComboBox*      m_modelBox   = nullptr;
-    QList<QCheckBox*> m_algoBoxes;
-    // algorithm name → its generated controls; only for stages with knobs.
-    QHash<QString, vos::ParamPanel*> m_algoPanels;
+    // Read-only now: the source is chosen in the rail, and the node shows what
+    // that resolved to.
+    QLabel*         m_deviceLabel = nullptr;
+    QLabel*         m_capsLabel   = nullptr;
+    QComboBox*      m_modelBox    = nullptr;
+    // The processing chain, in the one widget that owns it console-wide.
+    vos::ChainEditor* m_chain = nullptr;
+
+    // Detector thresholds and the pipeline-level acceleration choice, both moved
+    // here from the Dashboard: they configure a deploy rather than watch one.
+    QSlider*           m_confSlider  = nullptr;
+    QLabel*            m_confLabel   = nullptr;
+    QLabel*            m_accelHw     = nullptr;
+    vos::ToggleSwitch* m_accelToggle = nullptr;
     QRadioButton*   m_sinkApp    = nullptr;
     QRadioButton*   m_sinkScreen = nullptr;
     QPushButton*    m_deployBtn  = nullptr;

@@ -7,6 +7,7 @@
 #include "../core/InferenceTypes.h"
 
 #include <QFrame>
+#include <QHash>
 #include <QLabel>
 #include <QVariantMap>
 #include <QVector>
@@ -164,6 +165,11 @@ public:
     QString     algorithm() const { return m_algo; }
     QVariantMap values() const    { return m_values; }
 
+    // Put values back into the controls — for restoring an operator's tuning
+    // after the panel is rebuilt. Silent: setting a control this way must not
+    // read as an edit, or restoring state would look like a hundred retunes.
+    void setValues(const QVariantMap& values);
+
 signals:
     void changed(const QString& algo, const QVariantMap& values);
 
@@ -172,6 +178,16 @@ private:
 
     QString     m_algo;
     QVariantMap m_values;
+
+    // Controls by parameter key, so setValues() can find them again. The scale
+    // for a slider is not recoverable from the widget (an int slider stands in
+    // for a float range), so the mapping back is kept alongside it.
+    struct Control {
+        QWidget* widget = nullptr;
+        double   min    = 0.0;
+        double   step   = 1.0;
+    };
+    QHash<QString, Control> m_controls;
 };
 
 // Mono ALL_CAPS label helpers (the design's label-caps / data-mono styles).

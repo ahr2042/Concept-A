@@ -3,7 +3,9 @@
 #include "../theme/Theme.h"
 #include "Components.h"
 
+#include <QComboBox>
 #include <QHBoxLayout>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 // ── NavTabBar ────────────────────────────────────────────────────────────────
@@ -180,6 +182,35 @@ SideRail::SideRail(QWidget* parent)
     connect(add, &QPushButton::clicked, this, &SideRail::addSourceRequested);
     lay->addWidget(add);
 
+    // The active selection, in the space this rail was already wasting: it ran
+    // a list of mostly-disabled protocol rows and then ~400 px of nothing.
+    lay->addSpacing(14);
+    lay->addWidget(vos::makeHSeparator(this));
+    lay->addSpacing(10);
+
+    lay->addWidget(vos::capsLabel(QStringLiteral("ACTIVE SOURCE"), 8, this));
+    m_deviceBox = new QComboBox(this);
+    m_deviceBox->addItem(QStringLiteral("SCANNING…"));
+    m_deviceBox->setEnabled(false);
+    lay->addWidget(m_deviceBox);
+
+    lay->addSpacing(6);
+    lay->addWidget(vos::capsLabel(QStringLiteral("CAPTURE MODE"), 8, this));
+    m_capsBox = new QComboBox(this);
+    m_capsBox->setEnabled(false);
+    lay->addWidget(m_capsBox);
+
+    connect(m_deviceBox, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        QSignalBlocker block(m_capsBox);      // repopulating is not a selection
+        m_capsBox->clear();
+        if (idx >= 0 && idx < m_devices.size())
+            for (const CapInfo& c : m_devices[idx].caps)
+                m_capsBox->addItem(c.label, c.index);
+        m_capsBox->setEnabled(m_capsBox->count() > 0);
+        emitSource();
+    });
+    connect(m_capsBox, &QComboBox::currentIndexChanged, this, [this] { emitSource(); });
+
     lay->addStretch(1);
 
     auto* help = addCategory(QStringLiteral("?"), QStringLiteral("HELP"), true);
@@ -220,4 +251,58 @@ void SideRail::setLinkOnline(bool online)
 void SideRail::setUsbCount(int devices)
 {
     m_usbButton->setText(QStringLiteral("▸   USB SOURCES  [%1]").arg(devices));
+}
+
+void SideRail::setDevices(const QVector<DeviceInfo>& devices)
+{
+    m_devices = devices;
+
+    const int wanted = m_deviceBox->currentData().isValid()
+                     ? m_deviceBox->currentData().toInt() : -1;
+
+    QSignalBlocker block(m_deviceBox);        // repopulating is not a selection
+    m_deviceBox->clear();
+    if (devices.isEmpty()) {
+        m_deviceBox->addItem(QStringLiteral("NO_DEVICE_FOUND"));
+        m_deviceBox->setEnabled(false);
+        m_capsBox->clear();
+        m_capsBox->setEnabled(false);
+        return;
+    }
+    for (const DeviceInfo& d : devices)
+        m_deviceBox->addItem(d.name, d.index);
+    m_deviceBox->setEnabled(true);
+
+    // Keep the operator's pick across a rescan when the device is still there.
+    for (int i = 0; i < m_deviceBox->count(); ++i)
+        if (m_deviceBox->itemData(i).toInt() == wanted) {
+            m_deviceBox->setCurrentIndex(i);
+            break;
+        }
+    block.unblock();
+    emit m_deviceBox->currentIndexChanged(m_deviceBox->currentIndex());   // fill caps
+}
+
+void SideRail::setSource(int deviceIndex, int capIndex)
+{
+    for (int i = 0; i < m_deviceBox->count(); ++i)
+        if (m_deviceBox->itemData(i).toInt() == deviceIndex) {
+            if (m_deviceBox->currentIndex() != i)
+                m_deviceBox->setCurrentIndex(i);
+            break;
+        }
+    for (int i = 0; i < m_capsBox->count(); ++i)
+        if (m_capsBox->itemData(i).toInt() == capIndex) {
+            if (m_capsBox->currentIndex() != i)
+                m_capsBox->setCurrentIndex(i);
+            break;
+        }
+}
+
+void SideRail::emitSource()
+{
+    if (!m_deviceBox->currentData().isValid())
+        return;
+    emit sourceChanged(m_deviceBox->currentData().toInt(),
+                       m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0);
 }

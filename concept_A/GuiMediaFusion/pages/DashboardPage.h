@@ -39,14 +39,13 @@ public:
 
 signals:
     void fpsSample(double fps);          // forwarded to AnalyticsPage
+    void configureRequested();           // "CONFIGURE →" — jump to the Pipeline page
 
 private slots:
     void onDevices(const QVector<DeviceInfo>& devices);
-    void onAlgorithms(const QStringList& algos);
     void onModels(const QVector<DetectorModel>& models);
     void onInferenceStats(int sessionId, const InferenceSnapshot& snapshot);
-    void onDetectorSettingChanged();     // model / confidence moved by the operator
-    void onAlgorithmParamsChanged(const QString& algo, const QVariantMap& values);
+    void onConfigChanged(const BackendService::DeploySpec& cfg);
     void onStart();
     void onStop();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
@@ -57,11 +56,7 @@ private slots:
 private:
     QWidget* buildCenterColumn();
     QWidget* buildConfigPanel();
-    QString           algosCsv() const;
-    AlgorithmSettings algoParams() const;
-    // Enables/checks the GPU_ACCELERATION toggle from detected backends + the
-    // current selection (disabled + off when no GPU is present).
-    void     refreshAccelToggle();
+    QString  sourceName() const;
 
     BackendService* m_service;
     SystemMonitor*  m_monitor;
@@ -69,21 +64,13 @@ private:
     VideoTile*   m_tile = nullptr;
     int          m_sessionId = -1;
 
-    // config panel
-    QComboBox*   m_deviceBox = nullptr;
-    QComboBox*   m_capsBox   = nullptr;
-    QList<QCheckBox*> m_algoBoxes;
-    // algorithm name → its generated controls; only for stages with knobs.
-    QHash<QString, vos::ParamPanel*> m_algoPanels;
+    // Run controls, and a read-only view of what the Pipeline page configured.
+    QLabel*      m_chainSummary = nullptr;
+    QLabel*      m_modelLabel   = nullptr;
     QPushButton* m_startBtn  = nullptr;
     QPushButton* m_stopBtn   = nullptr;
-    QLabel*      m_hwLabel   = nullptr;
-    vos::ToggleSwitch* m_accelToggle = nullptr;   // GPU_ACCELERATION on/off
 
     // AI_INFERENCE / DETECTION_SUMMARY
-    QComboBox*      m_modelBox   = nullptr;
-    QSlider*        m_confSlider = nullptr;
-    QLabel*         m_confLabel  = nullptr;
     vos::Badge*     m_aiBadge    = nullptr;
     vos::Badge*     m_sumBadge   = nullptr;
     vos::StatTile*  m_objectsTile = nullptr;

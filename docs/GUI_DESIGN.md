@@ -49,7 +49,12 @@ core/
                          (QThread + ControlClient) and the daemon QProcess;
                          session table maps GUI stream sessions → daemon
                          pipeline ids (create→configure→start; stop→delete —
-                         fresh pipeline per session, ids re-based after erase)
+                         fresh pipeline per session, ids re-based after erase).
+                         Also holds the WORKING CONFIG — the one DeploySpec the
+                         console is assembling — plus primarySession(), the
+                         session it is running as. Surfaces edit their own slice
+                         (rail: source; Pipeline: chain + detector + accel) and
+                         follow configChanged; nothing keeps a second copy
   DeviceParser           parses the daemon's `devices` listing into
                          DeviceInfo{name, caps[{index,label,raw}]}
   InferenceTypes         parses `models` and `stats <id>` into DetectorModel /
@@ -63,8 +68,14 @@ theme/Theme              design tokens from the Stitch DESIGN.md (colors,
                          hue switching (cyan/magenta/lilac/peach)
 widgets/
   Components             SectionHeader, LedDot, Badge, ToggleSwitch, StatTile,
-                         MiniBars, LineChart, PlannedOverlay (placeholder veil)
-  Shell                  TopBar, NavTabBar, SideRail
+                         MiniBars, LineChart, PlannedOverlay (placeholder veil),
+                         ParamPanel (controls generated from a knob schema)
+  ChainEditor            THE processing-chain UI — one row per algorithm, with
+                         the tuned stage's ParamPanel expanded and the others
+                         collapsed, so the panel is the same height at twelve
+                         algorithms as at five. Owned by the Pipeline page
+  Shell                  TopBar, NavTabBar, SideRail (SideRail also carries the
+                         source + capture-mode selection)
   VideoTile              StreamReceiver + chrome (REC dot, source chip, FPS
                          badge) with offline "NO_SIGNAL" placeholder state
 pages/                   Dashboard, Pipeline, MultiGrid, Analytics, Compare,
@@ -81,14 +92,37 @@ Old `GuiMediaFusion{,Model,Controller}`, `PreLaunchSettings.ui`, `guiElements.h`
 
 ## 3. Design→backend feature matrix
 
+**One job per page.** The console has one configuration surface and one
+monitoring surface, and controls live on whichever that makes them:
+
+| Page | Its job |
+|---|---|
+| SideRail (all pages) | pick the source and capture mode |
+| Dashboard | **watch it run** — viewport, telemetry, run controls, a read-only view of the chain |
+| Pipeline | **set it up** — the chain and every knob, the detector, acceleration, DEPLOY |
+| Multi-grid / Analytics | watch many / watch over time |
+| Settings | the console itself |
+
+The pieces of a deploy used to live in the widget trees of whichever page
+happened to show them, so the Dashboard and the Pipeline page each carried a full
+copy of the chain editor and each built its own `DeploySpec` — which is why they
+could disagree (the Dashboard never sent the acceleration choice; the Pipeline
+page never sent the confidence). There is now one **working config** on
+`BackendService`, each surface edits its own slice, and both DEPLOY and START
+build from it. The session it is running as lives there too
+(`primarySession()`), so a knob moved on the Pipeline page retunes a stream the
+Dashboard started.
+
 | Design element (screen) | Status | Wiring |
 |---|---|---|
 | Live viewport w/ source chip, REC timer (Dashboard) | **REAL** | VideoTile + StreamReceiver on `start` socket |
 | START/STOP stream, REBOOT_CORE, TERMINATE_PID | **REAL** | deploy/stop session; daemon restart/shutdown |
+| Source + capture mode (SideRail, all pages) | **REAL** | `devices` → DeviceParser → working config |
 | Device list & caps selection (Device Manager) | **REAL** | `devices` → DeviceParser; CONNECT = `set-device` |
 | Protocol filter chips USB / RTSP / GigE / CoaXPress | PARTIAL | USB (V4L2) real; others disabled `PLANNED` |
-| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → one checkbox per reported algorithm → `algos` |
-| Per-algorithm parameter controls | **REAL** | `algo-params <algo>` → generated sliders/toggles/combos under each checkbox → `algo-set` (live) or carried in the deploy |
+| Processing chain (Pipeline node PROCESS) | **REAL** | `algos-list` → `vos::ChainEditor`, one row per reported algorithm → `algos` |
+| Per-algorithm parameter controls | **REAL** | `algo-params <algo>` → generated sliders/toggles/combos, **one stage expanded at a time** → `algo-set` (live) or carried in the deploy |
+| Active chain summary (Dashboard) | **REAL** | read-only; CONFIGURE → jumps to the Pipeline page |
 | Pipeline editor canvas SOURCE→PROCESS→SINK | PARTIAL | fixed linear chain (matches backend); node drag `PLANNED` |
 | DEPLOY PIPELINE | **REAL** | create → set-device → algos → start |
 | Multi-grid 2×2 tiles, per-tile source | **REAL**¹ | one session per tile (¹ limited by #cameras) |
