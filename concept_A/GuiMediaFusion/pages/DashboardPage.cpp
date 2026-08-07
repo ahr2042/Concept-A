@@ -138,24 +138,6 @@ QWidget* DashboardPage::buildConfigPanel()
     // ── PIPELINE_CONFIGURATION (real) ──
     outer->addWidget(new vos::SectionHeader(QStringLiteral("PIPELINE_CONFIGURATION"), panel));
 
-    outer->addWidget(vos::capsLabel(QStringLiteral("VIDEO SOURCE"), 8, panel));
-    m_deviceBox = new QComboBox(panel);
-    m_deviceBox->addItem(QStringLiteral("SCANNING…"));
-    outer->addWidget(m_deviceBox);
-
-    outer->addWidget(vos::capsLabel(QStringLiteral("CAPTURE MODE"), 8, panel));
-    m_capsBox = new QComboBox(panel);
-    outer->addWidget(m_capsBox);
-
-    connect(m_deviceBox, &QComboBox::currentIndexChanged, this, [this](int idx) {
-        m_capsBox->clear();
-        if (idx >= 0 && idx < m_devices.size())
-            for (const CapInfo& c : m_devices[idx].caps)
-                m_capsBox->addItem(c.label, c.index);
-        publishSource();
-    });
-    connect(m_capsBox, &QComboBox::currentIndexChanged, this, [this] { publishSource(); });
-
     outer->addWidget(vos::capsLabel(QStringLiteral("PROCESSING CHAIN (OPENCV)"), 8, panel));
     auto* algoHost = new QWidget(panel);
     auto* algoLay = new QVBoxLayout(algoHost);
@@ -310,15 +292,18 @@ void DashboardPage::selfTestStart()
 void DashboardPage::onDevices(const QVector<DeviceInfo>& devices)
 {
     m_devices = devices;
-    m_deviceBox->clear();
-    if (devices.isEmpty()) {
-        m_deviceBox->addItem(QStringLiteral("NO_VIDEO_DEVICE_FOUND"));
-        m_startBtn->setEnabled(false);
-        return;
-    }
-    for (const DeviceInfo& d : devices)
-        m_deviceBox->addItem(d.name.toUpper(), d.index);
-    m_startBtn->setEnabled(m_sessionId < 0);
+    // Choosing a source is the rail's job now; what this page needs to know is
+    // simply whether there is one to start.
+    m_startBtn->setEnabled(!devices.isEmpty() && m_sessionId < 0);
+}
+
+// The name of the source the working config points at, for the viewport chip.
+QString DashboardPage::sourceName() const
+{
+    for (const DeviceInfo& d : m_devices)
+        if (d.index == m_service->config().deviceIndex)
+            return d.name.toUpper();
+    return QStringLiteral("SOURCE");
 }
 
 void DashboardPage::onAlgorithms(const QStringList& algos)
@@ -480,24 +465,13 @@ void DashboardPage::refreshAccelToggle()
         : QStringLiteral("No GPU detected — CPU only."));
 }
 
-// Mirror this page's source widgets into the shared working config. Named
-// rather than inlined because two widgets feed it.
-void DashboardPage::publishSource()
-{
-    if (!m_deviceBox->currentData().isValid())
-        return;
-    m_service->setSource(m_deviceBox->currentData().toInt(),
-                         m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0);
-}
-
 void DashboardPage::onStart()
 {
-    if (m_deviceBox->count() == 0 || !m_deviceBox->currentData().isValid())
+    if (m_devices.isEmpty())
         return;
     // Deploy what the working config says, not what this page's widgets say.
     // The two deploy paths used to read their own widgets and so could disagree
     // — this one never sent the acceleration choice at all.
-    publishSource();
     BackendService::DeploySpec spec = m_service->config();
     spec.name = QStringLiteral("dashboard");
     m_sessionId = m_service->deploy(spec);
@@ -515,7 +489,7 @@ void DashboardPage::onSessionStarted(int sessionId, const QString& socket, const
 {
     if (sessionId != m_sessionId)
         return;
-    if (socket.isEmpty() || !m_tile->bind(socket.toStdString(), m_deviceBox->currentText())) {
+    if (socket.isEmpty() || !m_tile->bind(socket.toStdString(), sourceName())) {
         logErr("STREAM", QStringLiteral("cannot bind viewport to %1").arg(socket));
         m_service->stop(sessionId);
         m_sessionId = -1;
@@ -532,7 +506,7 @@ void DashboardPage::onSessionStopped(int sessionId)
         return;
     m_sessionId = -1;
     m_tile->unbind();
-    m_startBtn->setEnabled(m_deviceBox->count() > 0 && m_deviceBox->currentData().isValid());
+    m_startBtn->setEnabled(!m_devices.isEmpty());
     m_stopBtn->setEnabled(false);
 
     // The inference stage went away with the pipeline — stop showing its last

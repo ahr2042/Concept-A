@@ -35,6 +35,7 @@ private slots:
     void onModels(const QVector<DetectorModel>& models);
     void onDeploy();
     void publishChain();
+    void showSource(const BackendService::DeploySpec& cfg);
     void onHalt();
     void onSessionStarted(int sessionId, const QString& socket, const QString& desc);
     void onSessionStopped(int sessionId);
@@ -49,9 +50,11 @@ private:
     int             m_sessionId = -1;
 
     QStackedWidget* m_propsStack = nullptr;
-    QComboBox*      m_deviceBox  = nullptr;
-    QComboBox*      m_capsBox    = nullptr;
-    QComboBox*      m_modelBox   = nullptr;
+    // Read-only now: the source is chosen in the rail, and the node shows what
+    // that resolved to.
+    QLabel*         m_deviceLabel = nullptr;
+    QLabel*         m_capsLabel   = nullptr;
+    QComboBox*      m_modelBox    = nullptr;
     // The processing chain, in the one widget that owns it console-wide.
     vos::ChainEditor* m_chain = nullptr;
     QRadioButton*   m_sinkApp    = nullptr;

@@ -170,6 +170,7 @@ PipelinePage::PipelinePage(BackendService* service, QWidget* parent)
     connect(m_canvas, &NodeCanvas::nodeSelected, this, &PipelinePage::showNodeProps);
     connect(m_service, &BackendService::devicesChanged,    this, &PipelinePage::onDevices);
     connect(m_service, &BackendService::algorithmsChanged, this, &PipelinePage::onAlgorithms);
+    connect(m_service, &BackendService::configChanged, this, &PipelinePage::showSource);
     connect(m_service, &BackendService::modelsChanged,     this, &PipelinePage::onModels);
     connect(m_service, &BackendService::sessionStarted,    this, &PipelinePage::onSessionStarted);
     connect(m_service, &BackendService::sessionStopped,    this, &PipelinePage::onSessionStopped);
@@ -198,33 +199,24 @@ QWidget* PipelinePage::buildPropertiesPanel()
     srcTitle->setStyleSheet(QStringLiteral("color:%1;").arg(theme::palette().accent.name()));
     srcLay->addWidget(srcTitle);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("ID: NODE_SRC_0001"), 8, src));
+
+    // The selection itself lives in the rail, where it is visible from every
+    // page. What belongs to the node is what it resolved to: the device, the
+    // mode, and the caps the pipeline will actually negotiate.
     srcLay->addWidget(vos::capsLabel(QStringLiteral("DEVICE"), 8, src));
-    m_deviceBox = new QComboBox(src);
-    srcLay->addWidget(m_deviceBox);
+    m_deviceLabel = vos::dataLabel(QStringLiteral("—"), 10, src);
+    m_deviceLabel->setWordWrap(true);
+    srcLay->addWidget(m_deviceLabel);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("CAPTURE MODE"), 8, src));
-    m_capsBox = new QComboBox(src);
-    srcLay->addWidget(m_capsBox);
+    m_capsLabel = vos::dataLabel(QStringLiteral("—"), 10, src);
+    m_capsLabel->setWordWrap(true);
+    srcLay->addWidget(m_capsLabel);
     srcLay->addWidget(vos::capsLabel(QStringLiteral("RAW CAPS"), 8, src));
     auto* rawView = new QTextEdit(src);
     rawView->setReadOnly(true);
     rawView->setFixedHeight(120);
     srcLay->addWidget(rawView);
     rawView->setObjectName(QStringLiteral("rawCaps"));
-    connect(m_deviceBox, &QComboBox::currentIndexChanged, this, [this](int idx) {
-        m_capsBox->clear();
-        if (idx >= 0 && idx < m_devices.size()) {
-            for (const CapInfo& c : m_devices[idx].caps)
-                m_capsBox->addItem(c.label, c.index);
-            m_canvas->setNodeTitle(0, m_devices[idx].name.toUpper().left(20));
-        }
-    });
-    connect(m_capsBox, &QComboBox::currentIndexChanged, this, [this](int cidx) {
-        auto* view = findChild<QTextEdit*>(QStringLiteral("rawCaps"));
-        const int didx = m_deviceBox->currentIndex();
-        if (view && didx >= 0 && didx < m_devices.size()
-            && cidx >= 0 && cidx < m_devices[didx].caps.size())
-            view->setPlainText(m_devices[didx].caps[cidx].raw);
-    });
     srcLay->addStretch(1);
     m_propsStack->addWidget(src);
 
@@ -325,10 +317,30 @@ void PipelinePage::showNodeProps(int node)
 void PipelinePage::onDevices(const QVector<DeviceInfo>& devices)
 {
     m_devices = devices;
-    m_deviceBox->clear();
-    for (const DeviceInfo& d : devices)
-        m_deviceBox->addItem(d.name.toUpper(), d.index);
     m_deployBtn->setEnabled(!devices.isEmpty() && m_sessionId < 0);
+    showSource(m_service->config());
+}
+
+// Reflect whatever source the rail has selected into the SOURCE node.
+void PipelinePage::showSource(const BackendService::DeploySpec& cfg)
+{
+    const DeviceInfo* device = nullptr;
+    for (const DeviceInfo& d : m_devices)
+        if (d.index == cfg.deviceIndex)
+            device = &d;
+
+    const CapInfo* cap = nullptr;
+    if (device)
+        for (const CapInfo& c : device->caps)
+            if (c.index == cfg.capIndex)
+                cap = &c;
+
+    m_deviceLabel->setText(device ? device->name.toUpper() : QStringLiteral("—"));
+    m_capsLabel->setText(cap ? cap->label : QStringLiteral("—"));
+    if (auto* view = findChild<QTextEdit*>(QStringLiteral("rawCaps")))
+        view->setPlainText(cap ? cap->raw : QString());
+    if (device)
+        m_canvas->setNodeTitle(0, device->name.toUpper().left(20));
 }
 
 void PipelinePage::onModels(const QVector<DetectorModel>& models)
@@ -376,12 +388,10 @@ void PipelinePage::publishChain()
 
 void PipelinePage::onDeploy()
 {
-    if (!m_deviceBox->currentData().isValid())
+    if (m_devices.isEmpty())
         return;
     // Deploy the working config rather than this page's widgets. It used to
     // build its own spec here, which is why it never sent the confidence.
-    m_service->setSource(m_deviceBox->currentData().toInt(),
-                         m_capsBox->currentData().isValid() ? m_capsBox->currentData().toInt() : 0);
     publishChain();
     BackendService::DeploySpec spec = m_service->config();
     spec.screenSink = m_sinkScreen->isChecked();
@@ -417,7 +427,7 @@ void PipelinePage::onSessionStopped(int sessionId)
     if (sessionId != m_sessionId) return;
     m_sessionId = -1;
     m_canvas->setNodeLive(false);
-    m_deployBtn->setEnabled(m_deviceBox->count() > 0);
+    m_deployBtn->setEnabled(!m_devices.isEmpty());
     m_haltBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("IDLE"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kOnSurfaceVariant));
@@ -429,7 +439,7 @@ void PipelinePage::onSessionFailed(int sessionId, const QString& error)
     Q_UNUSED(error);
     m_sessionId = -1;
     m_canvas->setNodeLive(false);
-    m_deployBtn->setEnabled(m_deviceBox->count() > 0);
+    m_deployBtn->setEnabled(!m_devices.isEmpty());
     m_haltBtn->setEnabled(false);
     m_statusChip->setText(QStringLiteral("FAILED"));
     m_statusChip->setStyleSheet(QStringLiteral("color:%1;").arg(theme::kError));

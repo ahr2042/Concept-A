@@ -59,7 +59,7 @@ private:
     QWidget* buildConfigPanel();
     QString           algosCsv() const;
     AlgorithmSettings algoParams() const;
-    void              publishSource();
+    QString           sourceName() const;
     // Enables/checks the GPU_ACCELERATION toggle from detected backends + the
     // current selection (disabled + off when no GPU is present).
     void     refreshAccelToggle();
@@ -71,8 +71,6 @@ private:
     int          m_sessionId = -1;
 
     // config panel
-    QComboBox*   m_deviceBox = nullptr;
-    QComboBox*   m_capsBox   = nullptr;
     QList<QCheckBox*> m_algoBoxes;
     // algorithm name → its generated controls; only for stages with knobs.
     QHash<QString, vos::ParamPanel*> m_algoPanels;
