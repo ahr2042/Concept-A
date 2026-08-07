@@ -67,6 +67,8 @@ public:
     // empty when no stage reports. Deliberately a list rather than "the stats":
     // more than one stage can report (a detector and a motion stage), and
     // returning only the first hid the others with no error and no clue.
+    //
+    // This does NOT take m_mutex — see m_statsStages below.
     std::vector<InferenceStats> stageStats() const;
 
 private:
@@ -78,10 +80,29 @@ private:
     // default is picked up instead of being pinned by a stale copy.
     std::map<std::string, AlgorithmParams>  m_algoParams;
 
-    std::vector<std::unique_ptr<Algorithm>> m_algos;
+    // shared_ptr rather than unique_ptr so stageStats() can hold a stage alive
+    // without holding a lock — see m_statsStages.
+    std::vector<std::shared_ptr<Algorithm>> m_algos;
     DetectorConfig                          m_detectorConfig;
     AccelBackend                            m_accel = AccelBackend::CPU;
     mutable std::mutex                      m_mutex;
+
+    // The same stages again, behind their own lock, so a telemetry poll never
+    // queues behind a frame: m_mutex is held for the WHOLE algorithm chain on
+    // every buffer, so reading stats through it made the 1 Hz poll wait out a
+    // frame's OpenCV work and report a sample time it had not actually taken
+    // (docs/PERFORMANCE.md, P15).
+    //
+    // stageStats() copies these pointers, releases m_statsMutex, and only then
+    // calls snapshotStats(). Shared ownership is what makes letting go of the
+    // lock safe: setAlgorithms() may drop the chain meanwhile, and
+    // ~DetectorAlgorithm joins a worker thread that can be mid-forward-pass, so
+    // a raw pointer would be either a crash or a ~57 ms wait.
+    //
+    // Lock order is m_mutex -> m_statsMutex, in setAlgorithms() and nowhere
+    // else; stageStats() takes only the second, so there is no cycle.
+    std::vector<std::shared_ptr<Algorithm>> m_statsStages;
+    mutable std::mutex                      m_statsMutex;
     GstVideoInfo                            m_info;
     bool                                    m_haveInfo = false;
     gulong                                  m_probeId  = 0;
